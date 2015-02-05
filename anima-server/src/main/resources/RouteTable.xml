@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RoutingTable>
+	<Server id="Game1">
+		<item>1</item>
+		<item>2</item>
+	</Server>
+	
+	<Server id="Game2">
+		<item>3</item>
+		<item>4</item>
+	</Server>
+	
+	<Server id="Fight1">
+		<item>5</item>
+	</Server>
+	<Server id="Fight2">
+		<item>6</item>
+	</Server>
+</RoutingTable>
