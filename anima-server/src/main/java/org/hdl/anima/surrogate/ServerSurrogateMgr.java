@@ -33,18 +33,20 @@ public class ServerSurrogateMgr extends BasicModule{
 	public void initialize(Application application) {
 		super.initialize(application);
 		surrogateConfigs = application.getServerConifg().getSurrogateConfigs();
-		surrogates = new HashMap<String, ServerSurrogate>(surrogateConfigs.size());
 	}
 
 	@Override
 	public void start() throws IllegalStateException {
-		for (int i = 0;i < surrogateConfigs.size();i++) {
-			ServerSurrogateConfig config = surrogateConfigs.get(i);
-			if (surrogates.containsKey(config.getServerId())) {
-				throw new IllegalStateException("Failed to start server surrogate module,cause : include the same of server surrogate name " + config.getServerId());
+		if (surrogateConfigs != null) {
+			surrogates = new HashMap<String, ServerSurrogate>(surrogateConfigs.size());
+			for (int i = 0;i < surrogateConfigs.size();i++) {
+				ServerSurrogateConfig config = surrogateConfigs.get(i);
+				if (surrogates.containsKey(config.getServerId())) {
+					throw new IllegalStateException("Failed to start server surrogate module,cause : include the same of server surrogate name " + config.getServerId());
+				}
+				ServerSurrogate serverSurrogate = new ServerSurrogate(application, createAppConf(config));
+				surrogates.put(config.getServerId(), serverSurrogate);
 			}
-			ServerSurrogate serverSurrogate = new ServerSurrogate(application, createAppConf(config));
-			surrogates.put(config.getServerId(), serverSurrogate);
 		}
 	}
 
