@@ -61,7 +61,7 @@ public class BackendServer extends BasicModule {
 	public void start() throws IllegalStateException {
 		try {
 			BackendCodec codec = new BackendCodec(application);
-			Transporters.bind(conf, wrapChannelHandler(requestChannelHandler),codec);
+			server = Transporters.bind(conf, wrapChannelHandler(requestChannelHandler),codec);
 		} catch (RemotingException e) {
 			throw new IllegalStateException("Failed start backend server,cause :" + e.getMessage(),e);
 		}
