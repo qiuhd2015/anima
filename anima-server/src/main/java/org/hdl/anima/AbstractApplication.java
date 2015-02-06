@@ -1,5 +1,7 @@
 package org.hdl.anima;
 
+import org.hdl.anima.common.ScheduledExecutor;
+
 /**
  * Application Interface
  * @author qiuhd

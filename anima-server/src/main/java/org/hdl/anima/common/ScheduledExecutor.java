@@ -1,4 +1,4 @@
-package org.hdl.anima;
+package org.hdl.anima.common;
 
 import java.util.Date;
 import java.util.TimerTask;
