@@ -3,6 +3,7 @@ package org.hdl.anima.client;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -28,6 +29,7 @@ public class AsyncClientMgr extends BasicModule {
 
 	private List<AsyncClientConfig> asyncClientConfigs ;
 	private Map<String, AsyncClient> asyncClientMap;
+	private Map<String/*servetType*/,List<AsyncClient>> asyncClientsByType;
 	private static AtomicInteger sequenceIdCounter = new AtomicInteger(0);
 	private AsyncClientResponseArgMapping responseArgMapping ;
 	private Map<Integer, AsyncMethodCall<?>> asyncMethodCalls;
@@ -54,7 +56,6 @@ public class AsyncClientMgr extends BasicModule {
 		super.initialize(application);
 		asyncClientConfigs = application.getServerConifg().getAsyncClientConfigs();
 		if (asyncClientConfigs != null) {
-			asyncClientMap = new HashMap<String, AsyncClient>(asyncClientConfigs.size());
 			responseArgMapping = AsyncClientResponseArgMapping.getInstance();
 			asyncMethodCalls = new ConcurrentHashMap<Integer, AsyncClientMgr.AsyncMethodCall<?>>();
 			AsyncClientHelper.setAsyncCientMgr(this);
@@ -64,14 +65,24 @@ public class AsyncClientMgr extends BasicModule {
 	@Override
 	public void start() throws IllegalStateException {
 		if (asyncClientConfigs != null && asyncClientConfigs.size() > 0) {
+			asyncClientMap = new HashMap<String, AsyncClient>(asyncClientConfigs.size());
+			asyncClientsByType = new HashMap<String, List<AsyncClient>>();
 			for (int i = 0;i < asyncClientConfigs.size();i++) {
 				AsyncClientConfig config = asyncClientConfigs.get(i);
 				if (asyncClientMap.containsKey(config.getServerId())) {
 					throw new IllegalStateException("Failed to start backend to server module,cause : include the same of server id " + config.getServerId());
 				}
+				
 				AsyncClient asyncClient = new AsyncClient(application, createAppConf(config));
 				asyncClient.setResponseHandler(this.responseHandler);
 				asyncClientMap.put(config.getServerId(), asyncClient);
+				String serverType = config.getServerType();
+				List<AsyncClient> asyncClientList = asyncClientsByType.get(serverType);
+				if (asyncClientList == null) {
+					asyncClientList = new LinkedList<AsyncClient>();
+					asyncClientsByType.put(serverType, asyncClientList);
+				}
+				asyncClientList.add(asyncClient);
 			}
 		}
 	}
@@ -98,33 +109,35 @@ public class AsyncClientMgr extends BasicModule {
 	@SuppressWarnings("unchecked")
 	public <T> int request(String serverId,int msgId,Record requestArg,AsyncMethodCallback<T> callback) {
 		if (StringUtils.isEmpty(serverId)) {
-			throw new NullPointerException("serverId can not empty!");
+			throw new NullPointerException("ServerId can not be empty!");
 		}
 		
 		if (!asyncClientMap.containsKey(serverId)) {
-			throw new IllegalArgumentException("") ;
+			throw new IllegalArgumentException("ServerId : " + serverId + " unfound ") ;
 		}
 		
 		if (msgId <= 0) {
 			throw new IllegalArgumentException("Request error,Cause : message id less than zero");
 		}
 		
-		if (requestArg == null) {
-			throw new NullPointerException("requestArgs can not empty!");
-		}
+//		if (requestArg == null) {
+//			throw new NullPointerException("requestArgs can not empty!");
+//		}
 		
 		if (callback == null) {
-			throw new NullPointerException("callback can not empty!");
+			throw new IllegalArgumentException("callback can not be null!");
 		}
 		
 		Class<T> clazz = null;
 		
 		if (!responseArgMapping.contains(msgId)) {
-			synchronized (requestArg.getClass()) {
+			
+			String msgIdStr = String.valueOf(msgId).intern();
+			
+			synchronized (msgIdStr) {
 				if (!responseArgMapping.contains(msgId)) {
 					Type[] types =  callback.getClass().getGenericInterfaces();
 					Type type = types[0];
-//					System.out.println(types.length);
 					if (type instanceof ParameterizedType) {
 						ParameterizedType t = (ParameterizedType) type ;
 						Type[] typeArray = t.getActualTypeArguments();
@@ -136,8 +149,6 @@ public class AsyncClientMgr extends BasicModule {
 					}
 				}
 			}
-		}else {
-			clazz = (Class<T>) responseArgMapping.getResponseArgClazz(msgId);
 		}
 		
 		int sequence =  sequenceIdCounter.incrementAndGet();
@@ -145,7 +156,7 @@ public class AsyncClientMgr extends BasicModule {
 		request.setSequence(sequence);
 		request.setContent(requestArg);
 		request.setTwoWay(true);
-		request.setSid(-1);		//表示后台服务器
+		request.setSid(-1);		//表示服务器之间消息
 		AsyncClient client = asyncClientMap.get(serverId);
 		AsyncMethodCall<T> methodCall = new AsyncMethodCall<T>(client, request, callback);
 		methodCall.call();
@@ -187,6 +198,42 @@ public class AsyncClientMgr extends BasicModule {
 	}
 	
 	/**
+	 * 通知指定类型服务器
+	 * @param serverId
+	 * @param msgId
+	 * @param requestArg
+	 */
+	public void notifyForType(String serverType,int msgId,Record requestArg) {
+		if (StringUtils.isEmpty(serverType)) {
+			throw new NullPointerException("serverType can not be empty!");
+		}
+		
+		if (!asyncClientsByType.containsKey(serverType)) {
+			throw new IllegalArgumentException("ServerType : " + serverType + " unfound") ;
+		}
+		
+		if (msgId <= 0) {
+			throw new IllegalArgumentException("Request error,Cause : message id less than zero");
+		}
+		
+//		if (requestArg == null) {
+//			throw new NullPointerException("requestArgs can not empty!");
+//		}
+		
+		int sequence =  sequenceIdCounter.incrementAndGet();
+		Request request = new Request(msgId);
+		request.setSequence(sequence);
+		request.setContent(requestArg);
+		request.setTwoWay(false);
+		request.setSid(-1);		//表示后台服务器
+		
+		List<AsyncClient> asyncClients = this.asyncClientsByType.get(serverType);
+		for (AsyncClient client : asyncClients) {
+			client.send(request);
+		}
+	}
+	
+	/**
 	 * 
 	 * Async Method call
 	 * @author qiuhd
@@ -198,22 +245,22 @@ public class AsyncClientMgr extends BasicModule {
 		
 		private final AsyncMethodCallback<T> methodCallback;
 		
-		private long startTime;
+//		private long startTime;
 		
 		private final AsyncClient asyncClient;
 		
 		public AsyncMethodCall(AsyncClient asyncClient,Request request,AsyncMethodCallback<T> methodCallback) {
-			if (asyncClient == null) {
-				throw new NullPointerException("asyncClient can not empty!") ;
-			}
-			
-			if (request == null) {
-				throw new NullPointerException("request can not be empty!");
-			}
-			
-			if (methodCallback == null) {
-				throw new NullPointerException("methodCallback can not be empty!");
-			}
+//			if (asyncClient == null) {
+//				throw new NullPointerException("asyncClient can not empty!") ;
+//			}
+//			
+//			if (request == null) {
+//				throw new NullPointerException("request can not be empty!");
+//			}
+//			
+//			if (methodCallback == null) {
+//				throw new NullPointerException("methodCallback can not be empty!");
+//			}
 			this.asyncClient = asyncClient;
 			this.request = request;
 			this.methodCallback = methodCallback;
@@ -221,7 +268,7 @@ public class AsyncClientMgr extends BasicModule {
 		
 		public void call() {
 			asyncClient.send(request);
-			startTime = System.currentTimeMillis();
+//			startTime = System.currentTimeMillis();
 		}
 		
 		@SuppressWarnings("unchecked")
@@ -234,8 +281,32 @@ public class AsyncClientMgr extends BasicModule {
 			}
 		}
 
-		public long getStartTime() {
-			return startTime;
+//		private long getStartTime() {
+//			return startTime;
+//		}
+	}
+
+	@Override
+	public void destroy() {
+		super.destroy();
+		asyncClientConfigs = null;
+		if (asyncClientMap != null) {
+			asyncClientMap.clear();
+			asyncClientMap = null;
+		}
+		if (this.asyncClientsByType != null) {
+			asyncClientMap.clear();
+			asyncClientMap = null;
+		}
+		
+		if (responseArgMapping != null) {
+			responseArgMapping.destroy();
+		}
+		
+		if (this.asyncMethodCalls != null) {
+			this.asyncMethodCalls.clear();
+			this.asyncMethodCalls = null;
 		}
 	}
+	
 }

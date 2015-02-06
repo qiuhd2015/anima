@@ -207,6 +207,12 @@ public final class AppHelper {
 						throw new IllegalStateException("Failed to load from " + CONF_NAME_STRING + ",cause : the connect-server-id attribute is empty!") ;
 					}
 					
+					
+					String serverType = itemEle.attributeValue("type");
+					if (StringUtils.isEmpty(serverType)) {
+						throw new IllegalStateException("Failed to load from " + CONF_NAME_STRING + ",cause : the type attribute is empty!") ;
+					}
+					
 					String remoteIP = itemEle.attributeValue("remoteIP");
 					
 					if (StringUtils.isEmpty(remoteIP)) {
@@ -259,7 +265,7 @@ public final class AppHelper {
 						heartbeatTimeout = Integer.valueOf(heartbeatTimeoutStr);
 					}
 					
-					asyncClientConfig = new AsyncClientConfig(remoteName,remoteIP,remotePort,connectTimeout,connects);
+					asyncClientConfig = new AsyncClientConfig(remoteName,serverType,remoteIP,remotePort,connectTimeout,connects);
 					asyncClientConfig.setReconnect(reconnectStr);
 					asyncClientConfig.setSendReconnect(sendReconnect);
 					asyncClientConfig.setHeartbeat(heartbeat);

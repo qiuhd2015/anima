@@ -7,7 +7,8 @@ package org.hdl.anima.client;
  */
 public class AsyncClientConfig {
 	
-	private String serverId;			//后台服务器名称
+	private String serverId;			//后台服务器唯一标识
+	private String serverType;			//后台服务器类型
 	private String remoteHost;			//远程主机
 	private int remotePort;				//远程对外接口
 	private int connectTimeout;			//连接超时时间
@@ -20,9 +21,10 @@ public class AsyncClientConfig {
 		
 	}
 	
-	public AsyncClientConfig(String serverId, String remoteHost,
+	public AsyncClientConfig(String serverId,String servetType, String remoteHost,
 			int remotePort, int connectTimout, int connects) {
 		this.serverId = serverId;
+		this.serverType = servetType;
 		this.remoteHost = remoteHost;
 		this.remotePort = remotePort;
 		this.connectTimeout = connectTimout;
@@ -91,5 +93,13 @@ public class AsyncClientConfig {
 
 	public void setHeartbeat(int heartbeat) {
 		this.heartbeat = heartbeat;
+	}
+
+	public String getServerType() {
+		return serverType;
+	}
+
+	public void setServerType(String serverType) {
+		this.serverType = serverType;
 	}
 }

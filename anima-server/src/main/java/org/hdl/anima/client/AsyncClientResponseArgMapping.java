@@ -57,4 +57,11 @@ public class AsyncClientResponseArgMapping {
 			responseArgMapping.put(msgId, clazz);
 		}
 	}
+	
+	public void destroy() {
+		if (responseArgMapping != null) {
+			responseArgMapping.clear();
+			responseArgMapping = null;
+		}
+	}
 }

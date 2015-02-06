@@ -39,4 +39,14 @@ public final class AsyncClientHelper {
 	public static void notify(String serverId,int msgId,Record requestArg) {
 		clientMgr.notify(serverId, msgId, requestArg);
 	}
+	
+	/**
+	 * 向指定类型后台服务器发送通知
+	 * @param serverId		后台服务id
+	 * @param msgId         消息id
+	 * @param requestArg    请求参数
+	 */
+	public static void notifyForType(String serverType,int msgId,Record requestArg) {
+		clientMgr.notifyForType(serverType, msgId, requestArg);
+	}
 }
