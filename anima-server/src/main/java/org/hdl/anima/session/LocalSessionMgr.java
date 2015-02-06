@@ -94,15 +94,20 @@ public class LocalSessionMgr extends BasicModule{
 	 * @return
 	 */
 	private LocalSession getSessionById(String sid) {
-		List<LocalSession> localSession = sessionBySid.get(sid);
-		if (localSession != null && localSession.size() > 0 ) {
-			if (localSession.size() == 1) {
-				return localSession.get(0);
+		List<LocalSession> localSessionList = sessionBySid.get(sid);
+		LocalSession localSession = null;
+		if (localSessionList != null && localSessionList.size() > 0 ) {
+			if (localSessionList.size() == 1) {
+				return localSessionList.get(0);
 			}
 			int randowIndex = random.nextInt(sessionBySid.size());
-			return localSession.get(randowIndex);
+			localSession =  localSessionList.get(randowIndex);
 		}
-		return null;
+		
+		if (localSession == null) {
+			throw new IllegalStateException("Failed to send the message,Cause:Did not found sid :" + sid);
+		}
+		return localSession;
 	}
 	
 	public static LocalSession getOrCreateSession(Channel channel) {
@@ -130,10 +135,6 @@ public class LocalSessionMgr extends BasicModule{
 	 */
 	public void send(String sid,AbstractMessage message) {
 		LocalSession localSession = getSessionById(sid);
-		if (localSession == null) {
-			logger.error("Failed to send the message {} ,Cause:Did not found connection between front server and backend server!",message);
-			return ;
-		}
 		localSession.send(message);
 	}
 	
@@ -146,6 +147,7 @@ public class LocalSessionMgr extends BasicModule{
 		LinkedListMultimap<String, LocalSession> sessionMap =  sessionByStype.get(stype);
 		if (sessionMap == null) {
 			logger.error("Failed to broadcast message:" + message,new IllegalStateException("Could not found the fronent server with type " + stype));
+			return ;
 		}
 		for (String serverId : sessionMap.keySet()) {
 			LocalSession session = getSessionById(serverId);
