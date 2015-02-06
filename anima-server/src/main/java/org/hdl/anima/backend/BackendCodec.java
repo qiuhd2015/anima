@@ -62,9 +62,11 @@ public class BackendCodec extends ExchangeCodec {
 			if (mappingInfo != null) {
 				Decodeable content = mappingInfo.getParameterObjectFactory()
 						.createObject();
-				// 序列化请求体
-				content.deserialize(input);
-				request.setContent(content);
+				if (content != null) {
+					// 序列化请求体
+					content.deserialize(input);
+					request.setContent(content);
+				}
 			} else {
 				request.setBroken(true);
 				request.setContent(new Exception("Did not found request mapping info,Request info :" + request));

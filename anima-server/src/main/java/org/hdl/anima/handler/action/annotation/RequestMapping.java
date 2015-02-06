@@ -20,11 +20,11 @@ import org.hdl.anima.handler.HandlerInterceptor;
 @Documented
 public @interface RequestMapping {
 	
-	int value() default 0;
+	int value();
 	
-	RequestType type() default RequestType.REQUEST;
+	RequestType[] type() default {};
 	
-	Class<? extends Decodeable> param();
+	Class<? extends Decodeable>[] param() default {};
 	
 	Class<? extends HandlerInterceptor>[] interceptor()  default {};
 }

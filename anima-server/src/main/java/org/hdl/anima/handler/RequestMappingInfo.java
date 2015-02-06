@@ -25,15 +25,23 @@ public class RequestMappingInfo {
 	
 	private final Method method ;
 
-	public RequestMappingInfo(Method method ,int id, RequestType requestType, Class<? extends Decodeable> param) {
+	public RequestMappingInfo(Method method ,int id, RequestType[] requestType, Class<? extends Decodeable>[] params) {
 		checkArgument(id > 0,"id <= 0");
-		checkArgument(requestType != null,"requestType is required");
-		checkArgument(param != null,"param is required");
+		//checkArgument(requestType != null,"requestType is required");
+		//checkArgument(param != null,"param is required");
 		this.method = method;
 		this.id = id;
-		this.requestType = requestType;
-		this.param = param;
-		parameterObjectFactory = new RequestParameterObjectFactory(param);
+		if (requestType != null && requestType.length > 0) {
+			this.requestType = requestType[0];
+		}else {
+			this.requestType = RequestType.REQUEST;
+		}
+		if (params != null && params.length > 0) {
+			this.param = params[0];
+		}else {
+			this.param = null;
+		}
+		parameterObjectFactory = new RequestParameterObjectFactory(this.param);
 	}
 
 	public int getId() {
@@ -91,6 +99,9 @@ public class RequestMappingInfo {
 		}
 		
 		public Decodeable createObject() {
+			
+			if (parameterType == null) return null;
+			
 			Decodeable object = null;
 			try {
 				object = parameterType.newInstance();

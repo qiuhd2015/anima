@@ -260,8 +260,8 @@ public class RequestMappingMethodHandler extends BasicModule{
 		RequestMapping methodAnnotation = AnnotationUtils.findAnnotation(method, RequestMapping.class);
 		if (methodAnnotation != null) {
 			int id = methodAnnotation.value();
-			RequestType requetsType = methodAnnotation.type();
-			Class<? extends Decodeable> param = methodAnnotation.param();
+			RequestType[] requetsType = methodAnnotation.type();
+			Class<? extends Decodeable>[] param = methodAnnotation.param();
 			Class<? extends HandlerInterceptor>[] interceptorClazzs = methodAnnotation.interceptor();
 				for (Class<? extends HandlerInterceptor> interceptorClazz : interceptorClazzs) {
 					HandlerInterceptor interceptor = null;

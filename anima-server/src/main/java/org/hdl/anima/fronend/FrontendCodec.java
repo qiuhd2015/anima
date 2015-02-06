@@ -60,9 +60,11 @@ public class FrontendCodec extends ExchangeCodec {
 			if (mappingInfo != null) {
 				Decodeable content = mappingInfo.getParameterObjectFactory()
 						.createObject();
-				// 序列化请求体
-				content.deserialize(input);
-				request.setContent(content);
+				if (content != null) {
+					// 序列化请求体
+					content.deserialize(input);
+					request.setContent(content);
+				}
 			} else {
 				int readable = is.available();
 				byte[] body = new byte[readable];
