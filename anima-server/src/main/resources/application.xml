@@ -24,9 +24,9 @@
 <application>
 	<servers>
 		<server id="Gate1" type="gate" host="172.17.32.24" port="8601" frontend="true" threads="300" maxConnects="100000" heartbeat="10000000" reconnectionSecond="30">
-<!-- 			<frontend-to-backends> -->
-<!-- 				<frontend-to-backend connect-server-id="game_server_1" remoteIP="172.17.32.24" remotePort="8602" connectTimout="3000" connects="1" reconnect="true" sendReconnect="true"/> -->
-<!-- 			</frontend-to-backends> -->
+			<frontend-to-backends>
+				<frontend-to-backend connect-server-id="game_server_1" remoteIP="172.17.32.24" remotePort="8602" connectTimout="3000" connects="1" reconnect="true" sendReconnect="true"/>
+			</frontend-to-backends>
 			<action-scan base-packages="org.hdl.fish.gate.action"/>
 		</server>
 	</servers>

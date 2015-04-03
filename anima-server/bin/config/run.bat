@@ -1,0 +1,1 @@
+java -Xms512m -Xmx512m -Xmn128m -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:gc.log -Dwrite.statistics=true -Djava.ext.dirs="./lib" "org.hdl.gameserver.test.benchmark.BenchmarkClient"  > "logs/benchmark.log"

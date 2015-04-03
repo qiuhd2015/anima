@@ -28,6 +28,7 @@ public class MethodHandlerAapater implements HandlerAdapter {
 		Object returnValue = invokHandler.invokeForRequest(request, session);
 		// assert request type
 		if (request.isRequest()) {
+			//TODO FIXME 返回值为空时，抛出指针异常
 			// assert return value type
 			if (!Encodeable.class.isAssignableFrom(returnValue.getClass())) {
 				throw new IllegalArgumentException("");
