@@ -1,6 +1,7 @@
 package org.hdl.anima.handler;
 
 import org.hdl.anima.protocol.Request;
+import org.hdl.anima.protocol.Response;
 import org.hdl.anima.session.ISession;
 
 
@@ -12,5 +13,5 @@ import org.hdl.anima.session.ISession;
  */
 public interface HandlerAdapter {
 	
-	Object handle(Request requset,ISession session, Object handler) throws Exception;
+	Object handle(Request requset,Response response,ISession session, Object handler) throws Exception;
 }

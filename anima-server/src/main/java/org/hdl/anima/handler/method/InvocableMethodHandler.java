@@ -7,6 +7,7 @@ import java.util.Arrays;
 import org.hdl.anima.Application;
 import org.hdl.anima.common.io.Decodeable;
 import org.hdl.anima.protocol.Request;
+import org.hdl.anima.protocol.Response;
 import org.hdl.anima.session.ISession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,9 +40,9 @@ public class InvocableMethodHandler extends MethodHandler {
 	 * @return
 	 * @throws Exception
 	 */
-	public final Object invokeForRequest(Request request,ISession session) throws Exception {
+	public final Object invokeForRequest(Request request,Response response,ISession session) throws Exception {
 
-		Object[] args = getMethodArgumentValues(request, session);
+		Object[] args = getMethodArgumentValues(request,response, session);
 		if (logger.isTraceEnabled()) {
 			StringBuilder sb = new StringBuilder("Invoking [");
 			sb.append(getBeanType().getSimpleName()).append(".");
@@ -89,7 +90,7 @@ public class InvocableMethodHandler extends MethodHandler {
 	/**
 	 * Get the method argument values for the current request.
 	 */
-	private Object[] getMethodArgumentValues(Request request,ISession session) throws Exception {
+	private Object[] getMethodArgumentValues(Request request,Response response,ISession session) throws Exception {
 		MethodParameter[] parameters = getMethodParameters();
 		Object[] args = new Object[parameters.length];
 		for (int i = 0; i < parameters.length; i++) {
@@ -97,8 +98,10 @@ public class InvocableMethodHandler extends MethodHandler {
 			if (Decodeable.class.isAssignableFrom(parameter.getParameterType())) {
 				args[i] = request.getContent() ;
 			}else if (ISession.class.isAssignableFrom(parameter.getParameterType())) {
-				args[i] = session ;
-			}else {
+				args[i] = session;
+			}else if (Response.class.isAssignableFrom(parameter.getParameterType())) { 
+				args[i] = response;
+		    }else {
 				String error = getArgumentResolutionErrorMessage("Unkown parameter type :",i);
 				throw new IllegalStateException(error);
 			}

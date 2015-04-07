@@ -48,27 +48,43 @@ public class RequestDispatcher extends BasicModule {
 			return ;
 		}
 		
+		Response response = wrapResponse(request);
+		Object result = null;
 		try {
 			if(!handlerChain.applyPreHandle(request, session)) {
 				return ;
 			}
-			
-			Object result = handelrAdapter.handle(request, session, handlerChain.getHandler());
-			
+			result = handelrAdapter.handle(request, response,session, handlerChain.getHandler());
 			handlerChain.applyPostHandle(request, session, result);
 		} catch (Exception e) {
 			if (request.isRequest()) {
-				Response response = new Response(request.getId(),Response.SERVICE_ERROR);
+				response = new Response(request.getId());
 				response.setSequence(request.getSequence());
 				response.setSid(request.getSid());
+				response.setErrorCode(Response.SERVICE_ERROR);
 				response.setErrorDes("Service Error:" + e.getMessage());
 				response.setContent(null);
 				session.send(response);
-				throw new IllegalStateException("Failed to handle request,Reuqest info:" + request,e);
-			}else {
-				throw new IllegalStateException("Failed to handle request,Reuqest info:" + request,e);
 			}
+			throw new IllegalStateException("Failed to handle request,Reuqest info:" + request,e);
 		}
+	}
+	
+	/**
+	 * Wrap Response with Request
+	 * @param request
+	 * @return
+	 */
+	private Response wrapResponse(Request request) {
+		Response response = null;
+		if (request.isRequest()) {
+			int id = request.getId();
+			response = new Response(id);
+			response.setSid(request.getSid());
+			response.setSequence(request.getSequence());
+			response.setRequst(request);
+		}
+		return response;
 	}
 	
 	/**

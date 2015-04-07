@@ -16,28 +16,25 @@ import org.hdl.anima.session.ISession;
 public class MethodHandlerAapater implements HandlerAdapter {
 
 	@Override
-	public Object handle(Request request, ISession session, Object handler)
+	public Object handle(Request request,  Response response,ISession session, Object handler)
 			throws Exception {
-		return handleInternal(request, session, (MethodHandler)handler);
+		return handleInternal(request, response,session, (MethodHandler)handler);
 	}
 	
-	private Object handleInternal(Request request, ISession session,
+	private Object handleInternal(Request request, Response response,ISession session,
 			MethodHandler handler) throws Exception {
-		InvocableMethodHandler invokHandler = new InvocableMethodHandler(
-				handler);
-		Object returnValue = invokHandler.invokeForRequest(request, session);
+		InvocableMethodHandler invokHandler = new InvocableMethodHandler(handler);
+		Object returnValue = invokHandler.invokeForRequest(request,response,session);
 		// assert request type
 		if (request.isRequest()) {
-			//TODO FIXME 返回值为空时，抛出指针异常
 			// assert return value type
-			if (!Encodeable.class.isAssignableFrom(returnValue.getClass())) {
-				throw new IllegalArgumentException("");
+			if (returnValue != null) {
+				if (!Encodeable.class.isAssignableFrom(returnValue.getClass())) {
+					throw new IllegalArgumentException("");
+				}
+				response.setContent(returnValue);
+				session.send(response);
 			}
-			Response response = new Response(request.getId());
-			response.setSequence(request.getSequence());
-			response.setSid(request.getSid());
-			response.setContent(returnValue);
-			session.send(response);
 		}
 		return returnValue;
 	}

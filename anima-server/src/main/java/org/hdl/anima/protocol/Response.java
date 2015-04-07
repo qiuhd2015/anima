@@ -1,6 +1,7 @@
 package org.hdl.anima.protocol;
 
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 
 /**
  * Response message.
@@ -31,6 +32,8 @@ public class Response extends AbstractMessage{
 	private int errorCode = OK;
 	
 	private String errorDes;
+	
+	private Request request;
 	
 	public Response(int id) {
 		super(id, AbstractMessage.TYPE_RESPONSE);
@@ -74,6 +77,14 @@ public class Response extends AbstractMessage{
 		return this.errorCode == 200 ? true : false;
 	}
 	
+	public Request getRequest() {
+		return request;
+	}
+	
+	public void setRequst(Request request) {
+		this.request = request;
+	}
+
 	@Override
 	public String toString() {
 		return Objects.toStringHelper(this).add("hid", id)
