@@ -87,7 +87,7 @@ public class FrontendServer extends BasicModule {
 		try {
 			FrontendCodec codec = new FrontendCodec(this.application);
 			server = Transporters.bind(conf, new HandSnakeHandler(channelHandler),codec);
-			//startHeatbeatTimer();
+			startHeatbeatTimer();
 		} catch (RemotingException e) {
 			throw new IllegalStateException("Failed to start the fronent server,cause:"+ e.getMessage(),e);
 		}
