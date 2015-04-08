@@ -10,6 +10,7 @@ target/
 .settings/
 .project
 .classpath
+.bak
 
 # idea ignore
 .idea/
