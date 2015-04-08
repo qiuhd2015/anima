@@ -23,7 +23,7 @@ public final class AppHelper {
 	
 	private final static String CONF_PATH = "/" ;
 	
-	private final static String CONF_NAME_STRING = "Application.xml" ;
+	private final static String CONF_NAME_STRING = "AppConfig.xml";
 	
 	@SuppressWarnings("unchecked")
 	public static void loadFromStaticXml(Application application) throws DocumentException  {
