@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hdl.anima.Application;
+import org.hdl.anima.ServerConfig.ActionConfig;
+import org.hdl.anima.ServerConfig.ActionConfig.InterceptorConfig;
 import org.hdl.anima.common.io.Decodeable;
 import org.hdl.anima.common.module.BasicModule;
 import org.hdl.anima.common.utils.ReflectionUtils.MethodFilter;
@@ -123,9 +125,13 @@ public class RequestMappingMethodHandler extends BasicModule{
 
 	/**
 	 * Load all action instance from annotated type with the {@link Action}
+	 * @throws ClassNotFoundException 
 	 */
 	private void loadBeanResources() {
-		String[] componentPackages = application.getServerConifg().getComponetPackages();
+		ActionConfig actionConfig = application.getServerConifg().getActionConfig();
+		if (actionConfig == null) return ;
+		String[] componentPackages = actionConfig.getComponetScanPgs();
+		if (componentPackages == null || componentPackages.length == 0) return;
 		
 		TypeAnnotationsScanner typeScanner = new TypeAnnotationsScanner();
 		typeScanner.setResultFilter(new Predicate<String>() {
@@ -141,7 +147,6 @@ public class RequestMappingMethodHandler extends BasicModule{
 		
 		Reflections reflections = new Reflections(componentPackages,typeScanner);
 		Set<Class<?>> allActions = reflections.getTypesAnnotatedWith(Action.class);
-		
 		for (Class<?> handlerClass : allActions) {
 			if (handlerCache.containsKey(handlerClass)) {
 				continue;
@@ -156,8 +161,23 @@ public class RequestMappingMethodHandler extends BasicModule{
 				}
 				handlerCache.put(handlerClass, handlerObject);
 			} catch (Exception e) {
-				logger.error("Failed to instance object",e);
-				continue;
+				throw new IllegalStateException("Failed to load action,action class name:" + handlerClass.getName(),e);
+			}
+		}
+		//load global interceptors
+		InterceptorConfig[] interceptorConfigs = actionConfig.getInterceptorConfigs();
+		if (interceptorConfigs != null && interceptorConfigs.length > 0) {
+			for (InterceptorConfig config : interceptorConfigs) {
+				ClassLoader classLoader = application.getClassLoader();
+				try {
+					Class<?> loadClass = classLoader.loadClass(config.getClassName());
+					Constructor<?> constructor = loadClass.getConstructor();
+					HandlerInterceptor interceptor = (HandlerInterceptor) constructor.newInstance();
+					MappedInterceptor mappedInterceptor = new MappedInterceptor(config.getIncludes(),config.getExcludes(),interceptor);
+					this.interceptors.add(mappedInterceptor);
+				}catch(Exception e) {
+					throw new IllegalStateException("Failed to load interceptor,interceptor class name:" + config.getClassName(),e);
+				}
 			}
 		}
 	}

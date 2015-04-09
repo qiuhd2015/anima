@@ -27,7 +27,6 @@
 			<frontend-to-backends>
 				<frontend-to-backend connect-server-id="game_server_1" remoteIP="172.17.32.24" remotePort="8602" connectTimout="3000" connects="1" reconnect="true" sendReconnect="true"/>
 			</frontend-to-backends>
-			<action-scan base-packages="org.hdl.fish.gate.action"/>
 		</server>
 	</servers>
 </application>
