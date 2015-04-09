@@ -32,9 +32,9 @@ public class MethodHandlerAapater implements HandlerAdapter {
 				if (!Encodeable.class.isAssignableFrom(returnValue.getClass())) {
 					throw new IllegalArgumentException("");
 				}
-				response.setContent(returnValue);
-				session.send(response);
 			}
+			response.setContent(returnValue);
+			session.send(response);
 		}
 		return returnValue;
 	}
