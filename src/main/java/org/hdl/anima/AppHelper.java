@@ -7,6 +7,8 @@ import java.util.List;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
+import org.hdl.anima.ServerConfig.ActionConfig;
+import org.hdl.anima.ServerConfig.ActionConfig.InterceptorConfig;
 import org.hdl.anima.client.AsyncClientConfig;
 import org.hdl.anima.common.utils.StringUtils;
 import org.hdl.anima.common.utils.XMLFileHelper;
@@ -23,7 +25,7 @@ public final class AppHelper {
 	
 	private final static String CONF_PATH = "/" ;
 	
-	private final static String CONF_NAME_STRING = "Application.xml" ;
+	private final static String CONF_NAME_STRING = "AppConfig.xml";
 	
 	@SuppressWarnings("unchecked")
 	public static void loadFromStaticXml(Application application) throws DocumentException  {
@@ -35,6 +37,7 @@ public final class AppHelper {
 			throw new IllegalStateException("Failed to load from " + CONF_NAME_STRING + ",cause : No found servers element") ;
 		}
 		
+		//parse server tag
 		Iterator<Element> serverElementIt = serversElement.elementIterator();
 		while(serverElementIt.hasNext()) {
 			Element	serverElement = serverElementIt.next();
@@ -118,7 +121,8 @@ public final class AppHelper {
 			application.serverConfig.setHeartbeat(heartbeat);
 			application.serverConfig.setHeartbeatTimeout(heartbeatTimeout);
 			application.serverConfig.setReconnectionSecond(reconnectionSecond);
-			//server surrogate
+			
+			//parse <frontend-to-backends> tag
 			Element surrogatesEle = serverElement.element("frontend-to-backends");
 			ServerSurrogateConfig surrogateConfig ;
 		
@@ -193,6 +197,7 @@ public final class AppHelper {
 				application.serverConfig.setSurrogateConfigs(surrogateConfigs);
 			}
 			
+			//parse <backend-to-backends> tag
 			Element bakendToBackendsElement = serverElement.element("backend-to-backends");
 			AsyncClientConfig asyncClientConfig ;
 			
@@ -274,22 +279,89 @@ public final class AppHelper {
 				application.serverConfig.setAsyncClientConfigs(asyncClientConfigs.size() > 0 ? asyncClientConfigs : null);
 			}
 			
-			Element actionScanEle = serverElement.element("action-scan");
-			if (actionScanEle != null) {
-				String actionScanPackage = actionScanEle.attributeValue("base-packages");
-				String[] packageArray;
-				if (StringUtils.isEmpty(actionScanPackage)) {
-					throw new IllegalStateException("Failed to load from " + CONF_NAME_STRING + ",cause : No found base-packages attribute in action-scan element") ;
-				}
+			//parse <action> tag
+			Element actionEle = serverElement.element("action");
+			if (actionEle != null) {
 				
-				if (actionScanPackage.indexOf(";") != -1) {
+				String[] packageArray = null;
+				
+				Element comScanEle = actionEle.element("componet-scan");
+				if (comScanEle != null) {
+					String actionScanPackage = comScanEle.attributeValue("base-packages");
+					
+					if (StringUtils.isEmpty(actionScanPackage)) {
+						throw new IllegalStateException("Failed to load from " + CONF_NAME_STRING + ",cause : No found base-packages attribute in action-scan element") ;
+					}
 					packageArray = actionScanPackage.split(";");
-				}else {
-					packageArray = new String[1];
-					packageArray[0] = actionScanPackage;
 				}
 				
-				application.serverConfig.setComponetPackages(packageArray);
+				List<InterceptorConfig> icpConfigList = new ArrayList<ServerConfig.ActionConfig.InterceptorConfig>();
+				
+				Element icpsEle = actionEle.element("action-interceptors");
+				if (icpsEle != null) {
+					Element icpEle = icpsEle.element("action-interceptor");
+					if (icpEle != null) {
+						Iterator<Element> icpIt = icpsEle.elementIterator("action-interceptor");
+						while (icpIt.hasNext()) {
+							icpEle = (Element) icpIt.next();
+							String className = icpEle.attributeValue("class");
+							if (StringUtils.isEmpty(className)) {
+								throw new IllegalStateException("Failed to load from " + CONF_NAME_STRING + ",cause : the <action-interceptor> tag class attribute is empty!") ;
+							}
+							Element includesEle = icpEle.element("includes");
+							List<Integer> includeValue = new ArrayList<Integer>();
+							if (includesEle != null) {
+								Iterator<Element> valuesIt = includesEle.elementIterator("value");
+								while (valuesIt.hasNext()) {
+									Element valueEle = (Element) valuesIt.next();
+									String value = valueEle.getStringValue();
+									if (!StringUtils.isEmpty(value)) {
+										includeValue.add(Integer.valueOf(value));
+									}
+								}
+							}
+							
+							Element excludesEle = icpEle.element("excludes");
+							List<Integer> excludeValue = new ArrayList<Integer>();
+							if (excludeValue != null) {
+								Iterator<Element> valuesIt = excludesEle.elementIterator("value");
+								while (valuesIt.hasNext()) {
+									Element valueEle = (Element) valuesIt.next();
+									String value = valueEle.getStringValue();
+									if (!StringUtils.isEmpty(value)) {
+										excludeValue.add(Integer.valueOf(value));
+									}
+								}
+							}
+							int[] includes = null;
+							if (includeValue.size() > 0) {
+								includes = new int[includeValue.size()];
+								for (int index = 0;index < includeValue.size();index ++) {
+									includes[index] = includeValue.get(index);
+								}
+							}
+							
+							int[] excludes = null;
+							if (excludeValue.size() > 0) {
+								excludes = new int[excludeValue.size()];
+								for (int index = 0;index < excludeValue.size();index ++) {
+									excludes[index] = excludeValue.get(index);
+								}
+							}
+							icpConfigList.add(new InterceptorConfig(className, includes, excludes));
+						}
+					}
+					
+					InterceptorConfig[] icpConfigs = null;
+					if (icpConfigList.size() > 0) {
+						icpConfigs = new InterceptorConfig[icpConfigList.size()];
+						for (int index = 0;index < icpConfigList.size();index ++) {
+							icpConfigs[index] = icpConfigList.get(index);
+						}
+					}
+					ActionConfig actionConfig = new ActionConfig(icpConfigs, packageArray);
+					application.serverConfig.setActionConfig(actionConfig);
+				}
 			}
 		}
 	}

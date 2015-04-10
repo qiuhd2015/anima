@@ -4,13 +4,67 @@ import java.util.List;
 
 import org.hdl.anima.client.AsyncClientConfig;
 import org.hdl.anima.surrogate.ServerSurrogateConfig;
-
+import static com.google.common.base.Preconditions.checkArgument;
 /**
  * Server Configure
  * @author qiuhd
  * @since  2014年8月14日
  */
 public class ServerConfig {
+	/**
+	 * 
+	 * @author qiuhd
+	 *
+	 */
+	public static class ActionConfig {
+		
+		private final InterceptorConfig[] interceptorConfigs;
+		
+		private final String[] componetScanPgs;
+		
+		public ActionConfig(InterceptorConfig[] icpConfigs,String[] componetScanPgs) {
+			this.interceptorConfigs = icpConfigs;
+			this.componetScanPgs = componetScanPgs;
+		}
+		
+		public String[] getComponetScanPgs() {
+			return componetScanPgs;
+		}
+		
+		public InterceptorConfig[] getInterceptorConfigs() {
+			return interceptorConfigs;
+		}
+		
+		/**
+		 * 
+		 * @author qiuhd
+		 *
+		 */
+		public static class InterceptorConfig {
+			private final String className;
+			private final int[] includes;
+			private final int[] excludes;
+			
+			public InterceptorConfig(String className,int[] includes,int[] excludes) {
+				checkArgument(className != null,"className can not be null!");
+				this.className = className;
+				this.includes = includes;
+				this.excludes = excludes;
+			}
+			
+			public String getClassName() {
+				return className;
+			}
+			
+			public int[] getExcludes() {
+				return excludes;
+			}
+			
+			public int[] getIncludes() {
+				return includes;
+			}
+		}
+	}
 
 	private String sid ;									//服务器唯一名字
 	private String stype;									//服务器类型
@@ -23,17 +77,18 @@ public class ServerConfig {
 	private int heartbeatTimeout;							//心跳超时时间
 	private int reconnectionSecond;							//客户端重连时间
 	private List<ServerSurrogateConfig> surrogateConfigs;	//前端服务器与后端服务器连接配置
-	private List<AsyncClientConfig> asyncClientConfigs;	//后端服务器之间连接配置
-	private String[] componetPackages;
+	private List<AsyncClientConfig> asyncClientConfigs;		//后端服务器之间连接配置
+	private ActionConfig actionConfig;						//Action 配置
 	
 	public ServerConfig() {}
 	
-	public ServerConfig(String sid,String stype ,String host, int port, boolean frontend) {
+	public ServerConfig(String sid,String stype ,String host, int port, boolean frontend,ActionConfig actionConfig) {
 		this.sid = sid;
 		this.stype = stype;
 		this.host = host;
 		this.port = port;
 		this.frontend = frontend;
+		this.actionConfig = actionConfig;
 	}
 
 	public String getServerId() {
@@ -100,14 +155,6 @@ public class ServerConfig {
 		this.surrogateConfigs = surrogateConfigs;
 	}
 
-	public String[] getComponetPackages() {
-		return componetPackages;
-	}
-
-	public void setComponetPackages(String[] componetPackages) {
-		this.componetPackages = componetPackages;
-	}
-
 	public int getReconnectionSecond() {
 		return reconnectionSecond;
 	}
@@ -138,6 +185,14 @@ public class ServerConfig {
 
 	public void setMaxConnects(int maxConnects) {
 		this.maxConnects = maxConnects;
+	}
+	
+	public void setActionConfig(ActionConfig actionConfig) {
+		this.actionConfig = actionConfig;
+	}
+	
+	public ActionConfig getActionConfig() {
+		return actionConfig;
 	}
 }
 

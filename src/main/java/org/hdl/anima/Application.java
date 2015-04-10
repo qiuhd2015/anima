@@ -93,7 +93,6 @@ public class Application extends AbstractApplication{
 			loadModule(ClientSessionMgr.class.getName());
 			loadModule(FrontendServer.class.getName());
 		} else {
-//			loadModule(Handlers.class.getName());
 			loadModule(RequestMappingMethodHandler.class.getName());
 			loadModule(AsyncClientMgr.class.getName());
 			loadModule(RequestDispatcher.class.getName());
@@ -127,7 +126,7 @@ public class Application extends AbstractApplication{
 				module.initialize(this);
 			} catch (Exception e) {
 				e.printStackTrace();
-	            LOGGER.error("Failed to init module,module name {}.cause :{}",module,e.getMessage(),e);
+	            LOGGER.error("Failed to init module,module name {},cause :{}",module,e.getMessage(),e);
 			}
 		}
 	}
