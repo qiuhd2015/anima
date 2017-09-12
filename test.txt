@@ -1,0 +1,287 @@
+停车场系统数据推送协议
+
+1 接口说明
+1.1 接入方式
+停车场系统会主动调用第三方系统的http 协议接口，将数据推送过去。也可由三方平台控制进场出场、是否收费等。
+数据推送启用配置方式：
+登入停车场系统，基本设置->系统设置->系统对接，配置数据接收服务的ip和端口；
+车场设置->场区配置->扩展配置下，“扩展名称”、“扩展编号”对应推送数据中的“车场名称”、“车场编号”；
+基本设置->对接接口界面，启用需要对接的接口，并配置接口地址。
+
+1.2 协议加密
+Request:
+请求参数（http 请求body）用AES 加密的，需要16位字符的秘钥解密。算法模式：ECB，解密串编码方式：base64。 获取秘钥方式：
+1、从请求header中取出User-Agent，取出后格式如下{0}_{1}_{2}_{3}，
+{0}：车牌号码
+{1}：接口URI
+{2}：token
+{3}：md5字符串
+比如User-Agent：kun_/test/test_Nv6RRuGEVvmGjB+jimI/gw==_dd104a6b913f49ed2c52317fc5bbcef94e6383bd15c636b4b73
+	2、得到字符串{3}；
+	3、字符串{3}的最后一位0-9的阿拉伯数字，字符串{3}的第x+1到x+17位就是秘钥，上面User-Agent对应的秘钥就是04a6b913f49ed2c5。
+Reponse:
+	数据返回格式，以json字符串形式，无需加密。
+1.3 如果需token认证
+	调用的接口如果需要传token认证，需要启用“停车场签到”接口，将token返回给停车场，停车场推送的数据时header中会带上token。
+1.4 协议示列
+Request: 
+入场参数，加密前/解密后：
+{"actTime":"20170601193513","actType":"0","addBerth":"","arriveTime":"20170601193511","berthId":"","bizSn":"114","businessType":"1","carNum":"浙A12345","carType":"1","commParam":{"appVer":"","flag":"1","parkNum":"kun","psam":"","sim":"","sysVer":"Windows Vista","tsn":""},"guestRemainNum":"12","monthlyRemainNum":"98","voucherType":"101"}
+User-Agent: kun_/test/test_Nv6RRuGEVvmGjB+jimI/gw==_2aa97c6f8d231f2660d1ea162b38c2dc39e2a59d15c637030b3
+加密后：
+3pahwLxnh9kMao+UcLU03vuADFR+PNNZI6GnLaEXVdQhPMpFb7l7bBvUScbS9uLOSsWeaD6x/xyqvZQpJRRGygWfL5Btb+xDMUUTzJElqsF/FvZ5jfeyXuokiJFEmmjUkG4npa/ybDjd/y2hR5XTX81+uYzpNdMOG1KJDeKsv1GgQE09da9aZlgImRybzYSXp+8K4Xza8EHnfcl9WGt0J4ssfRVWBO1XW1ASyjFlJE93nKd+gWjsZ5Cw0zoRtvmJldRrgTuaOxEJXL+ROvmjcy8Ktdi3bTGxzEpgtqotlNm/k7OaM5zwn2NUZeUOiIEXHDhjJWDpnYX4lgCXuzGRzwdk1qFVWNzGDppFFtKpldiTppf9MttHzwTSoAHsAXNvdql8MFWPpPMAoKv469X7tYW6IPZ12iCJCv8VqtOPET0LQrnXWzWLezWWMro/B8fI8p695CDP+M+atBfVzl5acw==
+
+出场参数，加密前/解密后：
+{"actTime":"20170601193531","actType":"0","addBerth":"","arriveTime":"20170601193511","berthId":"","bizSn":"114","businessType":"2","carNum":"浙A12345","carType":"1","commParam":{"appVer":"","flag":"1","parkNum":"kun","psam":"","sim":"","sysVer":"Windows Vista","tsn":""},"discountFree":{"isFree":"0"},"guestRemainNum":"12","isOfflinePay":"1","leaveTime":"20170601193529","monthlyRemainNum":"99","orderNo":"","parkingTimeLength":"18","payMoney":"0","paymentType":"0","voucherNo":"","voucherType":""}
+User-Agent: kun_/test/test_Nv6RRuGEVvmGjB+jimI/gw==_6fbae631ce39e642f299a76e5541864861a91fde15c63706d0b
+加密后：
+lFRLW8udzSuk7v13K9iyskW5sYL1wC/d+l4eSg84hleZWWmZtd+haQKgHm/1gOip9NaiJU0WbFZpc7vXYgYbeH1P24EDtBg5EEND3CBmESU6C0jbDqwHV2zanWXM0zLjvpNhbLjL4YKxrFxCKxooqSgLtvyeCQzR3+2xopVfXbChlNfpTkPFR7GJW7CwAfrBDaWLbN+K0HhcxLxgTaqFSpzDsf0kdJXpbWmWVmMyxgIJ4X3rdyeyzNemIGgn+ZgzNE/ziCyLoXY2XME+Q6JcSigB0W6Roawfjvstnaw/SKxTHV9+w1MskSyM+bN/QYLTDzAo/sH9lVXBDdo8AP1tNmexgdO9vSfMD29im5aCpikOX/pWUVWUSJzCregj+5LvUpC2rBQwg7mJhmiGASRzdeF4+hJMOXn8UKxWSIaT9ZbmEQfZrlxVoKnWHNNynWnuqVwv0fwabPhC5Q/p+Fon0bfuQu4wB+F6exsZLwNfNp1nDRkaXtfTIVzUi+xVxtkcGi4WU5Q45oxeH5KmlM8B0BL+x/JV5xxCO9T7dsuAYdkoYmWGsnoGJOR6BoHFFI0q2PrPXIfyq8fUmaJV5XhC6r05yotst6RkjTMmFyvC7uhh62ZNHKhWNXRmPyRqIWMkp/lh7SvsDbEQofPV83OAiUhVyTmx88Zb4rkCk7RiMDc=
+
+Reponse:  json格式字符串
+{
+"data":{
+	"isOpen":"3"
+},
+"resCode":"000000",
+"resMsg":"success"
+}
+
+2 接口详情
+2.1.通用字段
+接口名称通用字段（commParam），每条数据推送消息都包含该字段
+请求参数列表
+	变量名	含义	类型	备注
+	appVer	应用版本号	string	[20] （收费系统应用软件版本号）
+	flag	是否实时数据	string	[1] （必填）（1-是，0-否）
+	parkNum	车场账号	string	[20] （必填）（系统为每个停车场分配的编号）
+该编号对应的是，场区配置中，扩展配置下的“扩展编号”
+	psam	PSAM卡号	string	[12] 可不填
+	sim	SIM卡号	string	[20]
+	sysVer	系统版本号	string	[20] （操作系统版本号）
+	tsn	终端序列号	string	[16] （数据采集器的硬件编号）
+
+
+2.2.停车场签到
+对接接口【7】停车场签到数据
+接口描述业务编号7； 调用说明 每24小时调用一次
+请求参数列表
+	变量名	含义	类型	备注
+	address	停车点地址	string	[100]
+	commParam	通用字段	object	包含通用字段中的所有字段
+	lat	纬度	string	[16]
+	lon	经度	string	[16]
+	openTime	服务时段	string	[100]
+	parkName	停车点名称	string	[100] （必填）
+	price	收费标准	string	[100]
+	pwd	密码	string	[32]（停车场端收费管理系统的登录密码）
+	uid	工号	string	[12]（停车场端收费管理系统的登录工号）
+响应参数列表
+	变量名	含义	类型	备注
+	data	返回数据{}	object	
+	    interval	时间间隔	string	整数，（单位：小时）。下次签到距离本次的时间间隔
+	    token	令牌	string	该token会在每个请求中代码，即User-Agent中{2}
+	resCode	返回编码	string	"000000"为成功，其它均为失败。
+	resMsg	返回信息	string	
+2.3.车辆预进场
+接口名称【1】车辆预进场数据
+接口描述业务编号 1; 调用说明 车辆预进场时，实时调用
+请求参数列表
+	变量名	含义	类型	备注
+	actTime	操作时间	string	[20] （必填）（格式：yyyyMMddHHmmss）
+	actType	操作类型	string	[4] （必填）（0代表月租长包车辆， 1代表时租访客车辆， 2代表免费车辆， 3代表异常未知车辆）
+	addBerth	附加泊位	string	[16]
+	berthId	泊位编号	string	[16]
+	bizSn	业务流水号	string	[20] （预进场数据ID）
+	businessType	业务类型	string	[4] （必填）（1-进场，2-出场）
+	carNum	车牌号	string	[16] （必填）
+	carType	车辆类型	string	[4] （必填）（1-小型车，2-大型车）
+	commParam	通用字段	object	包含通用字段中的所有字段
+	guestRemainNum	访客剩余车位	string	[8] （必填）
+	monthlyCertNumber	包月证号	string	[32]
+	monthlyRemainNum	月租剩余车位	string	[8] （必填）
+	preArriveTime	预进场时间	string	[20] （必填）（格式：yyyyMMddHHmmss）
+	uid	工号	string	[12] （停车场端收费管理系统的登录工号）
+	voucherNo	停车凭证号	string	[20]
+	voucherType	停车凭证类型	string	[4] （1、交通卡 2、银联卡 3、第三方支付 51、VIP卡号 101、临时车卡号 102、临时车票号）
+响应参数列表
+	变量名	含义	类型	备注
+	data	{}	object	
+	    isOpen	是否线上控制开闸	string	1：线上控制开闸，2：线上控制不开闸（欠费用户），3：线下控制处理
+	resCode	返回编码	string	"000000"标识操作成功，其他均为失败。
+	resMsg	返回信息	string	
+2.4.车辆进场
+接口名称【2】车辆进场数据
+接口描述业务编号 2; 调用说明 车辆实际进场时调用 【如果数据发送失败，会及时补发数据】
+请求参数列表
+	变量名	含义	类型	备注
+	actTime	操作时间	string	[20] （必填）（格式：yyyyMMddHHmmss）
+	actType	操作类型	string	[4] （必填）（0代表月租长包车辆， 1代表时租访客车辆， 2代表免费车辆， 3代表异常未知车辆）
+	addBerth	附加泊位	string	[16]
+	arriveTime	进场时间	string	[20] （必填）（格式：yyyyMMddHHmmss）
+	berthId	泊位编号	string	[16]
+	bizSn	业务流水号	string	[20] （进场数据ID）
+	businessType	业务类型	string	[4] （必填）（1-进场，2-出场）
+	carNum	车牌号	string	[16] （必填）
+	carType	车辆类型	string	[4] （必填）（1-小型车，2-大型车）
+	commParam	通用字段	object	包含通用字段中的所有字段
+	guestRemainNum	访客剩余车位	string	[8] （必填）
+	monthlyCertNumber	包月证号	string	[32]
+	monthlyRemainNum	月租剩余车位	string	[8] （必填）
+	uid	工号	string	[12] （停车场端收费管理系统的登录工号）
+	voucherNo	停车凭证号	string	[20]
+	voucherType	停车凭证类型	string	[4] （1、交通卡 2、银联卡 3、第三方支付 51、VIP卡号 101、临时车卡号 102、临时车票号）
+响应参数列表
+	变量名	含义	类型	备注
+	resCode	返回编码	string	"000000"为成功，其它均为失败。
+	resMsg	返回信息	string	
+2.5.车辆预出场
+接口名称【3】车辆预出场数据
+接口描述业务编号 3; 调用说明 车辆预出场时，实时调用
+请求参数列表
+	变量名	含义	类型	备注
+	actType	操作类型	string	[4] （0代表月租长包车辆， 1代表时租访客车辆， 2代表免费车辆， 3代表异常未知车辆）
+	arriveTime	进场时间	string	[20] （必填）（格式：yyyyMMddHHmmss）
+	carNum	车牌号	string	[16] （必填）
+	discountFree	免费优惠	object	
+	    isFree	是否免费	string	1：是，2：否
+	    remark	备注	string	备注说明
+	discountMoney	金额优惠集合	array<object>	
+	    money	金额优惠对象	object	
+	        name	名称	string	优惠名称
+	        remark	备注	string	备注说明
+	        value	金额值	string	（单位：元）
+	discountRate	折扣优惠集合	array<object>	
+	    rate	折扣优惠对象	object	
+	        name	名称	string	优惠名称
+	        remark	备注	string	备注说明
+	        value	折扣率	string	折扣百分比
+	discountTime	时间优惠集合	array<object>	
+	    time	时间优惠对象	object	
+	        name	名称	string	优惠名称
+	        remark	备注	string	备注说明
+	        value	时间值	string	（单位：小时）
+	leaveTime	出场时间	string	[20] （必填） （格式：yyyyMMddHHmmss）
+	parkNum	车场账号	string	[20] （必填）（系统为每个停车场分配的编号）
+	parkingTimeLength	停车时长	string	[8] （单位：秒）
+	payMoney	收费金额	string	[8] （必填）
+	uid	工号	string	[12] （停车场端收费管理系统的登录工号）
+	watchHouseCode	岗亭编号	string	[20]
+响应参数列表
+	变量名	含义	类型	备注
+	data		object	
+	    amountReceivable	应收金额	string	（单位：元）
+	    amoutActual	实收金额	string	（单位：元）
+	    isOpen	是否线上控制开闸	string	1：是，2：否
+	    isPayByLineAmount	是否按线上返回的金额收费	string	1：是，2：否
+	    remark	备注	string	备注说明
+	resCode	返回编码	string	"000000"标识操作成功，其他均为失败。
+	resMsg	返回信息	string	
+2.6.车辆出场
+接口名称【4】车辆出场确认数据
+接口描述业务编号 4; 车辆实际出场时，实时调用 【如果数据发送失败，会及时补发数据】
+请求参数列表
+	变量名	含义	类型	备注
+	actTime	操作时间	string	[20] （必填）（格式：yyyyMMddHHmmss）
+	actType	操作类型	string	[4] （必填）（0代表月租长包车辆， 1代表时租访客车辆， 2代表免费车辆， 3代表异常未知车辆）
+	addBerth	附加泊位	string	[16]
+	arriveTime	进场时间	string	[20] （必填）（格式：yyyyMMddHHmmss）
+	berthId	泊位编号	string	[16]
+	bizSn	业务流水号	string	[20] （出场数据ID）
+	businessType	业务类型	string	[4] （必填）（1-进场，2-出场）
+	carNum	车牌号	string	[16] （必填）
+	carType	车辆类型	string	[4] （必填）（1-小型车，2-大型车）
+	commParam	通用字段	object	包含通用字段中的所有字段
+	discountFree	免费优惠	object	
+	    isFree	是否免费	string	1：是，2：否
+	    remark	备注	string	备注说明
+	discountMoney	金额优惠集合	array<object>	
+	    money	金额优惠对象	object	
+	        name	名称	string	优惠名称
+	        remark	备注	string	备注说明
+	        value	金额值	string	（单位：元）
+	discountRate	折扣优惠集合	array<object>	
+	    rate	折扣优惠对象	object	
+	        name	名称	string	优惠名称
+	        remark	备注	string	备注说明
+	        value	折扣率	string	折扣百分比
+	discountTime	时间优惠集合	array<object>	
+	    time	时间优惠对象	object	
+	        name	名称	string	优惠名称
+	        remark	备注	string	备注说明
+	        value	时间值	string	（单位：小时）
+	guestRemainNum	访客剩余车位	string	[8] （必填）
+	isOfflinePay	是否停车场端线下收费	string	[1] （1-是，0-否）
+	isPayByLineAmount	是否按线上返回的金额收费	string	1：是，2：否
+	leaveTime	离场时间	string	[20] （必填）（格式：yyyyMMddHHmmss）
+	monthlyCertNumber	包月证号	string	[32]
+	monthlyRemainNum	月租剩余车位	string	[8] （必填）
+	orderNo	预约订单号	string	[12] （预约订单号，若有则需要上传）
+	parkingTimeLength	停车时长	string	[8] （单位：秒）
+	payMoney	收费金额	string	[8] （必填）
+	paymentType	支付类型	string	[4] （必填）（0代表现金支付， 1代表交通卡支付， 2代表银行卡支付， 3代表手机支付）
+	uid	工号	string	[12] （停车场端收费管理系统的登录工号）
+	voucherNo	停车凭证号	string	[20]
+	voucherType	停车凭证类型	string	[4]
+响应参数列表
+	变量名	含义	类型	备注
+	data		object	
+	    payType	支付类型	string	1：帐户扣费，2：车场现金
+	    remark	备注	string	对支付的说明文字
+	resCode	返回编码		"000000"标识操作成功，其他均为失败。
+	resMsg	返回信息		
+2.7.停车场车位数据上报
+接口名称【6】停车场车位数据
+接口描述业务编号 6； 每分钟调用一次
+请求参数列表
+	变量名	含义	类型	备注
+	actTime	操作时间	string	[20] （必填）（格式：yyyyMMddHHmmss）
+	bizSn	业务流水号	string	[20]
+	commParam	通用字段	object	包含通用字段中的所有字段
+	guestBerthNum	访客车位	string	[8]
+	guestRemainNum	访客剩余车位	string	[8]
+	monthlyBerthNum	月租车位	string	[8]
+	monthlyRemainNum	月租剩余车位	string	[8]
+	totBerthNum	总车位	string	[8]
+	totRemainNum	总剩余车位	string	[8]
+	uid	工号	string	[12] （停车场端收费管理系统的登录工号）
+响应参数列表
+	变量名	含义	类型	备注
+	data		object	
+	    interval		string	请求间隔,下次请求间隔的秒数（单位：秒）
+	resCode	返回编码	string	"000000"为成功，其它均为失败。
+	resMsg	返回信息	string	
+2.8.一次完整的停车记录
+接口名称【5】一次完整停车记录数据
+接口描述业务编号 5；【如果数据发送失败，会及时补发数据】
+请求参数列表
+	变量名	含义	类型	备注
+	addBerth	附加泊位	string	[16]
+	arriveTime	进场时间	string	[20] （格式：yyyyMMddHHmmss）
+	berthId	泊位编号	string	[16]
+	carNum	车牌号	string	[16] （必填）比如：沪A00000，不带“-”
+	carType	车辆类型	string	[4] （1-小型车，2-大型车）
+	commParam	通用字段	object	包含通用字段中的所有字段
+	compensateMoney	补缴金额	string	[8], 对于业务类型为补缴费的
+	dueBalance	剩余应付	string	[8]
+	dueMoney	应缴金额	string	[8], 应缴金额 = 实缴金额 + 实缴折扣 + 剩余应付；
+	factDiscount	计费折扣	string	[8]
+	factMoney	计费金额	string	[8], 计费金额 - 计费折扣 = 应缴金额；
+	leaveTime	离场时间	string	[20] （必填）（格式：yyyyMMddHHmmss）
+	leavingActType	离开操作类型	string	[4] （同出场132接口中的操作类型）
+	leavingBatchCode	离开批次号	string	[32]
+	leavingBizSn	离开业务流水号	string	[20] （出场数据ID）
+	parkingActType	停车操作类型	string	[4] （同进场131接口中的操作类型）
+	parkingBatchCode	到达批次号	string	[32]
+	parkingBizSn	到达业务流水号	string	[20] （进场数据ID）
+	parkingRecordType	业务类型	string	[4], 1（停车业务） 2（补缴费业务）
+	parkingTimeLength	停车时长	string	[8] （单位：秒）
+	payDiscount	实缴折扣	string	[8]
+	payMoney	实缴金额	string	[8]
+	prepayDiscount	预付费折扣	string	[9]
+	prepayMoney	预付费金额	string	[8]
+	prepayTimeLength	预付费时长	string	[8]
+	uid	工号	string	[12] （停车场端收费管理系统的登录工号）
+响应参数列表
+	变量名	含义	类型	备注
+	resCode	返回编码	string	"000000"为成功，其它均为失败。
+	resMsg	返回信息	string	
