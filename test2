@@ -1,0 +1,1984 @@
+public class CarArriveServlet extends HttpServlet {
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    private static final Logger logger = LoggerFactory.getLogger(CarArriveServlet.class);
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        logger.info("####CarArriveServlet Do post");
+        try {
+            doHandler(req, resp);
+        } catch (Exception e) {
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                BaseResp baseResp = BaseResp.createSuccessResp("success");
+                String response = JSON.toJSONString(baseResp);
+                out.write(response);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        }
+    }
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        logger.info("####CarArriveServlet Do get");
+        try {
+            doHandler(req, resp);
+        } catch (Exception e) {
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                BaseResp baseResp = BaseResp.createSuccessResp("success");
+                String response = JSON.toJSONString(baseResp);
+                out.write(response);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        }
+    }
+
+    private void doHandler(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+        String userAgent = getUserAgent(req);
+        logger.info("UserAgent : {}", userAgent);
+        if (validateUserAgentFormat(userAgent)) {
+            UserAgentInfo userAgentInfo = UserAgentInfo.of(userAgent);
+            BufferedReader br = new BufferedReader(new InputStreamReader(req.getInputStream()));
+            String line = null;
+            StringBuilder sb = new StringBuilder();
+            while ((line = br.readLine()) != null) {
+                sb.append(line);
+            }
+
+            String md5 = userAgentInfo.getMd5();
+            String content = sb.toString();
+            logger.info("Content : {} ,md5{}", content, md5);
+            String result = Decrypt(content, md5);
+            logger.info("Decode result : {}" + result);
+            CarArriveVo carPreArriveInfo = JSON.parseObject(result, CarArriveVo.class);
+            logger.info("CarArriveVo : {}", carPreArriveInfo);
+
+            resp.setCharacterEncoding("UTF-8");
+            resp.setContentType("application/json; charset=utf-8");
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                BaseResp baseResp = BaseResp.createSuccessResp("success");
+                String response = JSON.toJSONString(baseResp);
+                out.write(response);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        } else {
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                BaseResp baseResp = BaseResp.createSuccessResp("success");
+                String response = JSON.toJSONString(baseResp);
+                out.write(response);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        }
+    }
+
+    private String getUserAgent(HttpServletRequest request) {
+        return request.getHeader("User-Agent");
+    }
+
+    public boolean validateUserAgentFormat(String userAgent) {
+        boolean result = false;
+        if (userAgent != null && !"".equals(userAgent)) {
+            //从请求header中取出User-Agent，取出后格式如下{0}_{1}_{2}_{3}
+            int indexOf = userAgent.indexOf('_');
+            if (indexOf != -1) {
+                String[] split = userAgent.split("_");
+                if (split.length == 4) {
+                    String md5 = split[4];
+                    char index = md5.charAt(md5.length() - 1);
+                    if (!Character.isDigit(index)) {
+                        logger.error("Request error,md5 index error {}, {}", md5, index);
+                        return false;
+                    }
+                    return true;
+                } else {
+                    logger.error("Request error,user agent format error {}", userAgent);
+                }
+            } else {
+                logger.error("Request error,can not found underline in user agent {}", userAgent);
+            }
+        }
+
+        return result;
+    }
+
+    // 解密
+    public static String Decrypt(String sSrc, String sKey) throws Exception {
+        try {
+            // 判断Key是否正确
+            if (sKey == null) {
+                System.out.print("Key为空null");
+                return null;
+            }
+            // 判断Key是否为16位
+            if (sKey.length() != 16) {
+                System.out.print("Key长度不是16位");
+                return null;
+            }
+            byte[] raw = sKey.getBytes("utf-8");
+            SecretKeySpec skeySpec = new SecretKeySpec(raw, "AES");
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, skeySpec);
+            byte[] encrypted1 = new BASE64Decoder().decodeBuffer(sSrc);
+            try {
+                byte[] original = cipher.doFinal(encrypted1);
+                String originalString = new String(original, "utf-8");
+                return originalString;
+            } catch (Exception e) {
+                System.out.println(e.toString());
+                return null;
+            }
+        } catch (Exception ex) {
+            System.out.println(ex.toString());
+            return null;
+        }
+    }
+
+    //    actTime 操作时间    string  [20] （必填）（格式：yyyyMMddHHmmss）
+    //    actType 操作类型    string  [4] （必填）（0代表月租长包车辆， 1代表时租访客车辆， 2代表免费车辆， 3代表异常未知车辆）
+    //    addBerth    附加泊位    string  [16]
+    //    arriveTime  进场时间    string  [20] （必填）（格式：yyyyMMddHHmmss）
+    //    berthId 泊位编号    string  [16]
+    //    bizSn   业务流水号   string  [20] （进场数据ID）
+    //    businessType    业务类型    string  [4] （必填）（1-进场，2-出场）
+    //    carNum  车牌号 string  [16] （必填）
+    //    carType 车辆类型    string  [4] （必填）（1-小型车，2-大型车）
+    //    commParam   通用字段    object  包含通用字段中的所有字段
+    //    guestRemainNum  访客剩余车位  string  [8] （必填）
+    //    monthlyCertNumber   包月证号    string  [32]
+    //    monthlyRemainNum    月租剩余车位  string  [8] （必填）
+    //    uid 工号  string  [12] （停车场端收费管理系统的登录工号）
+    //    voucherNo   停车凭证号   string  [20]
+    //    voucherType 停车凭证类型  string  [4] （1、交通卡 2、银联卡 3、第三方支付 51、VIP卡号 101、临时车卡号 102、临时车票号）
+
+    public class CarArriveVo {
+
+        private String actTime; //操作时间    string  [20] （必填）（格式：yyyyMMddHHmmss）
+        private String actType; //操作类型    string  [4] （必填）（0代表月租长包车辆， 1代表时租访客车辆， 2代表免费车辆， 3代表异常未知车辆）
+        private String addBerth;// 附加泊位    string  [16]
+        private String arriveTime;//进场时间    string  [20] （必填）（格式：yyyyMMddHHmmss）
+        private String berthId;//berthId 泊位编号    string  [16]
+        private String bizSn;//业务流水号   string  [20] （进场数据ID）
+        private String businessType;//业务类型    string  [4] （必填）（1-进场，2-出场）
+        private String carNum;//车牌号 string  [16] （必填）
+        private String carType;//车辆类型    string  [4] （必填）（1-小型车，2-大型车）
+        private CommParam commParam;//通用字段    object  包含通用字段中的所有字段
+        private String guestRemainNum;//访客剩余车位  string  [8] （必填）
+        private String monthlyCertNumber;//包月证号    string  [32]
+        private String monthlyRemainNum;//月租剩余车位  string  [8] （必填）
+        private String uid;//工号  string  [12] （停车场端收费管理系统的登录工号）
+        private String voucherNo;//停车凭证号   string  [20]
+        private String voucherType;//停车凭证类型  string  [4] （1、交通卡 2、银联卡 3、第三方支付 51、VIP卡号 101、临时车卡号 102、临时车票号）
+
+        public String getActTime() {
+            return actTime;
+        }
+
+        public void setActTime(String actTime) {
+            this.actTime = actTime;
+        }
+
+        public String getActType() {
+            return actType;
+        }
+
+        public void setActType(String actType) {
+            this.actType = actType;
+        }
+
+        public String getAddBerth() {
+            return addBerth;
+        }
+
+        public void setAddBerth(String addBerth) {
+            this.addBerth = addBerth;
+        }
+
+        public String getArriveTime() {
+            return arriveTime;
+        }
+
+        public void setArriveTime(String arriveTime) {
+            this.arriveTime = arriveTime;
+        }
+
+        public String getBerthId() {
+            return berthId;
+        }
+
+        public void setBerthId(String berthId) {
+            this.berthId = berthId;
+        }
+
+        public String getBizSn() {
+            return bizSn;
+        }
+
+        public void setBizSn(String bizSn) {
+            this.bizSn = bizSn;
+        }
+
+        public String getBusinessType() {
+            return businessType;
+        }
+
+        public void setBusinessType(String businessType) {
+            this.businessType = businessType;
+        }
+
+        public String getCarNum() {
+            return carNum;
+        }
+
+        public void setCarNum(String carNum) {
+            this.carNum = carNum;
+        }
+
+        public String getCarType() {
+            return carType;
+        }
+
+        public void setCarType(String carType) {
+            this.carType = carType;
+        }
+
+        public CommParam getCommParam() {
+            return commParam;
+        }
+
+        public void setCommParam(CommParam commParam) {
+            this.commParam = commParam;
+        }
+
+        public String getGuestRemainNum() {
+            return guestRemainNum;
+        }
+
+        public void setGuestRemainNum(String guestRemainNum) {
+            this.guestRemainNum = guestRemainNum;
+        }
+
+        public String getMonthlyCertNumber() {
+            return monthlyCertNumber;
+        }
+
+        public void setMonthlyCertNumber(String monthlyCertNumber) {
+            this.monthlyCertNumber = monthlyCertNumber;
+        }
+
+        public String getMonthlyRemainNum() {
+            return monthlyRemainNum;
+        }
+
+        public void setMonthlyRemainNum(String monthlyRemainNum) {
+            this.monthlyRemainNum = monthlyRemainNum;
+        }
+
+        public String getUid() {
+            return uid;
+        }
+
+        public void setUid(String uid) {
+            this.uid = uid;
+        }
+
+        public String getVoucherNo() {
+            return voucherNo;
+        }
+
+        public void setVoucherNo(String voucherNo) {
+            this.voucherNo = voucherNo;
+        }
+
+        public String getVoucherType() {
+            return voucherType;
+        }
+
+        public void setVoucherType(String voucherType) {
+            this.voucherType = voucherType;
+        }
+    }
+
+    public static class BaseResp {
+
+        public static final String SUCCESS_CODE = "000000";
+        public static final String FAILURE_CODE = "111111";
+
+        private String resCode;
+        private String resMsg;
+
+        public BaseResp() {
+
+        }
+
+        public static BaseResp createSuccessResp(String resMsg) {
+            BaseResp resp = new BaseResp();
+            resp.setResCode(SUCCESS_CODE);
+            resp.setResMsg(resMsg);
+            return resp;
+        }
+
+        public static BaseResp createFailtrureResp(String resMsg) {
+            BaseResp resp = new BaseResp();
+            resp.setResCode(FAILURE_CODE);
+            resp.setResMsg(resMsg);
+            return resp;
+        }
+
+        public String getResCode() {
+            return resCode;
+        }
+
+        public void setResCode(String resCode) {
+            this.resCode = resCode;
+        }
+
+        public String getResMsg() {
+            return resMsg;
+        }
+
+        public void setResMsg(String resMsg) {
+            this.resMsg = resMsg;
+        }
+    }
+
+    public static class MQProducer {
+
+        public final static MQProducer INSTANCE = new MQProducer();
+        private final static String MQ_GROUP_NAME = "wx_gxcw_cpsb";
+        private volatile boolean started = false;
+
+        public class MQConifg {
+
+            public static final String CPSB_TOPIC = "gxcw_cpsb_12";
+
+            public static final String TAG_ORDER_CREATE = "tag_order_create";
+
+            public static final String TAG_ORDER_CANCEL = "tag_order_cancel";
+        }
+
+        DefaultMQProducer producer;
+
+        private MQProducer() {
+            producer = new DefaultMQProducer(MQ_GROUP_NAME);
+        }
+
+        public static MQProducer getInstance() {
+            return INSTANCE;
+        }
+
+        public synchronized void start(String remoteHost) {
+            if (remoteHost == null && !"".equals(remoteHost)) {
+                throw new NullPointerException("remoteHost is null");
+            }
+            try {
+                producer.setNamesrvAddr(remoteHost);
+                producer.start();
+                started = true;
+            } catch (Exception e) {
+                throw new java.lang.IllegalStateException("Failed to start MQProducer", e);
+            }
+        }
+
+        public void sendOrderCreate(ParkingRecord order) {
+            if (!started) {
+                throw new IllegalStateException("Failed to send mq message,cause of producer is not start!");
+            }
+
+            byte[] body = ObjectCodec.encode(order);
+            Message msgToBroker = new Message(MQConifg.CPSB_TOPIC, MQConifg.TAG_ORDER_CREATE, body);
+            try {
+                producer.send(msgToBroker, new SendCallback() {
+
+                    public void onSuccess(SendResult sendResult) {
+                        System.err.println(sendResult.getSendStatus());
+                    }
+
+                    public void onException(Throwable throwable) {
+                        throwable.printStackTrace();
+                    }
+                });
+            } catch (MQClientException e) {
+                e.printStackTrace();
+            } catch (RemotingException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        public synchronized void shutdown() {
+            if (producer != null) {
+                producer.shutdown();
+            }
+        }
+    }
+}
+
+public class CarLeaveServlet extends HttpServlet {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    private static final Logger logger = LoggerFactory.getLogger(CarLeaveServlet.class);
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        logger.info("####CarPreLeaveServlet Do post");
+        try {
+            doHandler(req, resp);
+        } catch (Exception e) {
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                CarPreLeaveReponse newSuccessInstane = CarPreLeaveReponse.createSuccessResp("success");
+                String response = JSON.toJSONString(newSuccessInstane);
+                out.write(response);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        }
+    }
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        logger.info("####CarPreLeaveServlet Do get");
+        try {
+            doHandler(req, resp);
+        } catch (Exception e) {
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                CarPreLeaveReponse newSuccessInstane = CarPreLeaveReponse.createSuccessResp("success");
+                String response = JSON.toJSONString(newSuccessInstane);
+                out.write(response);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        }
+    }
+
+    private void doHandler(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+        String userAgent = getUserAgent(req);
+        logger.info("UserAgent : {}", userAgent);
+        if (validateUserAgentFormat(userAgent)) {
+            UserAgentInfo userAgentInfo = UserAgentInfo.of(userAgent);
+            BufferedReader br = new BufferedReader(new InputStreamReader(req.getInputStream()));
+            String line = null;
+            StringBuilder sb = new StringBuilder();
+            while ((line = br.readLine()) != null) {
+                sb.append(line);
+            }
+
+            String md5 = userAgentInfo.getMd5();
+            String content = sb.toString();
+            logger.info("Content : {} ,md5{}", content, md5);
+            String result = Decrypt(content, md5);
+            logger.info("Decode result : {}" + result);
+
+            resp.setCharacterEncoding("UTF-8");
+            resp.setContentType("application/json; charset=utf-8");
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                CarPreLeaveReponse newSuccessInstane = CarPreLeaveReponse.createSuccessResp("success");
+                String response = JSON.toJSONString(newSuccessInstane);
+                out.write(response);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        } else {
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                CarPreLeaveReponse newSuccessInstane = CarPreLeaveReponse.createSuccessResp("success");
+                String response = JSON.toJSONString(newSuccessInstane);
+                out.write(response);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        }
+    }
+
+    private String getUserAgent(HttpServletRequest request) {
+        return request.getHeader("User-Agent");
+    }
+
+    public boolean validateUserAgentFormat(String userAgent) {
+        boolean result = false;
+        if (userAgent != null && !"".equals(userAgent)) {
+            //从请求header中取出User-Agent，取出后格式如下{0}_{1}_{2}_{3}
+            int indexOf = userAgent.indexOf('_');
+            if (indexOf != -1) {
+                String[] split = userAgent.split("_");
+                if (split.length == 4) {
+                    String md5 = split[4];
+                    char index = md5.charAt(md5.length() - 1);
+                    if (!Character.isDigit(index)) {
+                        logger.error("Request error,md5 index error {}, {}", md5, index);
+                        return false;
+                    }
+                    return true;
+                } else {
+                    logger.error("Request error,user agent format error {}", userAgent);
+                }
+            } else {
+                logger.error("Request error,can not found underline in user agent {}", userAgent);
+            }
+        }
+
+        return result;
+    }
+
+    // 解密
+    public static String Decrypt(String sSrc, String sKey) throws Exception {
+        try {
+            // 判断Key是否正确
+            if (sKey == null) {
+                System.out.print("Key为空null");
+                return null;
+            }
+            // 判断Key是否为16位
+            if (sKey.length() != 16) {
+                System.out.print("Key长度不是16位");
+                return null;
+            }
+            byte[] raw = sKey.getBytes("utf-8");
+            SecretKeySpec skeySpec = new SecretKeySpec(raw, "AES");
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, skeySpec);
+            byte[] encrypted1 = new BASE64Decoder().decodeBuffer(sSrc);
+            try {
+                byte[] original = cipher.doFinal(encrypted1);
+                String originalString = new String(original, "utf-8");
+                return originalString;
+            } catch (Exception e) {
+                System.out.println(e.toString());
+                return null;
+            }
+        } catch (Exception ex) {
+            System.out.println(ex.toString());
+            return null;
+        }
+    }
+
+    public class DiscountFree {
+
+        private String isFree;
+        private String remark;
+
+        public String getIsFree() {
+            return isFree;
+        }
+
+        public void setIsFree(String isFree) {
+            this.isFree = isFree;
+        }
+
+        public String getRemark() {
+            return remark;
+        }
+
+        public void setRemark(String remark) {
+            this.remark = remark;
+        }
+    }
+
+    public class DiscountMoney {
+
+        private String name;
+        private String remark;
+        private String value;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getRemark() {
+            return remark;
+        }
+
+        public void setRemark(String remark) {
+            this.remark = remark;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
+
+    public class DiscountRate {
+
+        private String name;//名称  string  优惠名称
+        private String remark;//备注  string  备注说明
+        private String value;//折扣率 string  折扣百分比
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getRemark() {
+            return remark;
+        }
+
+        public void setRemark(String remark) {
+            this.remark = remark;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
+
+    public class DiscountTime {
+
+        private String name;//名称  string  优惠名称
+        private String remark;//备注  string  备注说明
+        private String value;//时间值 string  （单位：小时)
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getRemark() {
+            return remark;
+        }
+
+        public void setRemark(String remark) {
+            this.remark = remark;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
+
+    public static class CarLeaveVO {
+
+        private String actTime;//操作时间    string  [20] （必填）（格式：yyyyMMddHHmmss）
+        private String actType;//操作类型    string  [4] （0代表月租长包车辆， 1代表时租访客车辆， 2代表免费车辆， 3代表异常未知车辆）
+        private String addBerth;//附加泊位    string  [16]
+        private String arriveTime;//进场时间    string  [20] （必填）（格式：yyyyMMddHHmmss）
+        private String berthId;//泊位编号    string  [16]
+        private String bizSn;// 业务流水号   string  [20] （出场数据ID）
+        private String businessType;//业务类型    string  [4] （必填）（1-进场，2-出场）
+        private String carNum;//车牌号 string  [16] （必填）
+        private String carType;//车辆类型    string  [4] （必填）（1-小型车，2-大型车）
+        private CommParam commParam;//通用字段    object  包含通用字段中的所有字段
+        private DiscountFree discountFree;// 免费优惠    object  
+        private List<DiscountMoney> discountMoney;//金额优惠集合  array<object>   
+        private List<DiscountRate> discountRate;//折扣优惠集合  array<object>   
+        private List<DiscountTime> discountTime;//时间优惠集合  array<object> 
+        private String guestRemainNum;//访客剩余车位  string  [8] （必填）
+        private String isOfflinePay;
+        private String isPayByLineAmount;
+        private String leaveTime;//出场时间    string  [20] （必填） （格式：yyyyMMddHHmmss）
+        private String monthlyCertNumber;//包月证号    string  [32]
+        private String monthlyRemainNum;//月租剩余车位  string  [8] （必填）
+        private String orderNo;//预约订单号   string  [12] （预约订单号，若有则需要上传）
+        private String parkingTimeLength;//停车时长    string  [8] （单位：秒）
+        private String payMoney;//收费金额    string  [8] （必填）
+        private String paymentType;//支付类型    string  [4] （必填）（0代表现金支付， 1代表交通卡支付， 2代表银行卡支付， 3代表手机支付）
+        private String uid;//工号  string  [12] （停车场端收费管理系统的登录工号）
+        private String voucherNo;//停车凭证号   string  [20]
+        private String voucherType;//停车凭证类型  string  [4]
+
+        public String getActTime() {
+            return actTime;
+        }
+
+        public void setActTime(String actTime) {
+            this.actTime = actTime;
+        }
+
+        public String getActType() {
+            return actType;
+        }
+
+        public void setActType(String actType) {
+            this.actType = actType;
+        }
+
+        public String getAddBerth() {
+            return addBerth;
+        }
+
+        public void setAddBerth(String addBerth) {
+            this.addBerth = addBerth;
+        }
+
+        public String getArriveTime() {
+            return arriveTime;
+        }
+
+        public void setArriveTime(String arriveTime) {
+            this.arriveTime = arriveTime;
+        }
+
+        public String getBerthId() {
+            return berthId;
+        }
+
+        public void setBerthId(String berthId) {
+            this.berthId = berthId;
+        }
+
+        public String getBizSn() {
+            return bizSn;
+        }
+
+        public void setBizSn(String bizSn) {
+            this.bizSn = bizSn;
+        }
+
+        public String getBusinessType() {
+            return businessType;
+        }
+
+        public void setBusinessType(String businessType) {
+            this.businessType = businessType;
+        }
+
+        public String getCarNum() {
+            return carNum;
+        }
+
+        public void setCarNum(String carNum) {
+            this.carNum = carNum;
+        }
+
+        public String getCarType() {
+            return carType;
+        }
+
+        public void setCarType(String carType) {
+            this.carType = carType;
+        }
+
+        public CommParam getCommParam() {
+            return commParam;
+        }
+
+        public void setCommParam(CommParam commParam) {
+            this.commParam = commParam;
+        }
+
+        public DiscountFree getDiscountFree() {
+            return discountFree;
+        }
+
+        public void setDiscountFree(DiscountFree discountFree) {
+            this.discountFree = discountFree;
+        }
+
+        public List<DiscountMoney> getDiscountMoney() {
+            return discountMoney;
+        }
+
+        public void setDiscountMoney(List<DiscountMoney> discountMoney) {
+            this.discountMoney = discountMoney;
+        }
+
+        public List<DiscountRate> getDiscountRate() {
+            return discountRate;
+        }
+
+        public void setDiscountRate(List<DiscountRate> discountRate) {
+            this.discountRate = discountRate;
+        }
+
+        public List<DiscountTime> getDiscountTime() {
+            return discountTime;
+        }
+
+        public void setDiscountTime(List<DiscountTime> discountTime) {
+            this.discountTime = discountTime;
+        }
+
+        public String getGuestRemainNum() {
+            return guestRemainNum;
+        }
+
+        public void setGuestRemainNum(String guestRemainNum) {
+            this.guestRemainNum = guestRemainNum;
+        }
+
+        public String getIsOfflinePay() {
+            return isOfflinePay;
+        }
+
+        public void setIsOfflinePay(String isOfflinePay) {
+            this.isOfflinePay = isOfflinePay;
+        }
+
+        public String getIsPayByLineAmount() {
+            return isPayByLineAmount;
+        }
+
+        public void setIsPayByLineAmount(String isPayByLineAmount) {
+            this.isPayByLineAmount = isPayByLineAmount;
+        }
+
+        public String getLeaveTime() {
+            return leaveTime;
+        }
+
+        public void setLeaveTime(String leaveTime) {
+            this.leaveTime = leaveTime;
+        }
+
+        public String getMonthlyCertNumber() {
+            return monthlyCertNumber;
+        }
+
+        public void setMonthlyCertNumber(String monthlyCertNumber) {
+            this.monthlyCertNumber = monthlyCertNumber;
+        }
+
+        public String getMonthlyRemainNum() {
+            return monthlyRemainNum;
+        }
+
+        public void setMonthlyRemainNum(String monthlyRemainNum) {
+            this.monthlyRemainNum = monthlyRemainNum;
+        }
+
+        public String getOrderNo() {
+            return orderNo;
+        }
+
+        public void setOrderNo(String orderNo) {
+            this.orderNo = orderNo;
+        }
+
+        public String getParkingTimeLength() {
+            return parkingTimeLength;
+        }
+
+        public void setParkingTimeLength(String parkingTimeLength) {
+            this.parkingTimeLength = parkingTimeLength;
+        }
+
+        public String getPayMoney() {
+            return payMoney;
+        }
+
+        public void setPayMoney(String payMoney) {
+            this.payMoney = payMoney;
+        }
+
+        public String getPaymentType() {
+            return paymentType;
+        }
+
+        public void setPaymentType(String paymentType) {
+            this.paymentType = paymentType;
+        }
+
+        public String getUid() {
+            return uid;
+        }
+
+        public void setUid(String uid) {
+            this.uid = uid;
+        }
+
+        public String getVoucherNo() {
+            return voucherNo;
+        }
+
+        public void setVoucherNo(String voucherNo) {
+            this.voucherNo = voucherNo;
+        }
+
+        public String getVoucherType() {
+            return voucherType;
+        }
+
+        public void setVoucherType(String voucherType) {
+            this.voucherType = voucherType;
+        }
+    }
+
+    public static class CarLeaveReponseData {
+
+        private String payType;//支付类型    string  1：帐户扣费，2：车场现金
+        private String remark;//备注  string  对支付的说明文字
+
+        public String getPayType() {
+            return payType;
+        }
+
+        public void setPayType(String payType) {
+            this.payType = payType;
+        }
+
+        public String getRemark() {
+            return remark;
+        }
+
+        public void setRemark(String remark) {
+            this.remark = remark;
+        }
+    }
+
+    public static class CarLeaveReponse extends BaseResp {
+
+        private CarLeaveReponseData data;
+
+        public CarLeaveReponseData getData() {
+            return data;
+        }
+
+        public void setData(CarLeaveReponseData data) {
+            this.data = data;
+        }
+
+        public static CarLeaveReponse createSuccessResp(String resMsg) {
+            CarLeaveReponse resp = new CarLeaveReponse();
+            CarLeaveReponseData data = new CarLeaveReponseData();
+            data.setPayType("2");
+            data.setRemark("");
+            resp.setResCode(SUCCESS_CODE);
+            resp.setData(data);
+            resp.setResMsg(resMsg);
+            return resp;
+        }
+
+        public static CarLeaveReponse createFailtrureResp(String resMsg) {
+            CarLeaveReponse resp = new CarLeaveReponse();
+            resp.setResCode(FAILURE_CODE);
+            resp.setResMsg(resMsg);
+            return resp;
+        }
+    }
+}
+
+
+public class CarPreLeaveServlet extends HttpServlet {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    private static final Logger logger = LoggerFactory.getLogger(CarPreLeaveServlet.class);
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        logger.info("####CarPreLeaveServlet Do post");
+        try {
+            doHandler(req, resp);
+        } catch (Exception e) {
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                CarPreLeaveReponse newSuccessInstane = CarPreLeaveReponse.createSuccessResp("success");
+                String response = JSON.toJSONString(newSuccessInstane);
+                out.write(response);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        }
+    }
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        logger.info("####CarPreLeaveServlet Do get");
+        try {
+            doHandler(req, resp);
+        } catch (Exception e) {
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                CarPreLeaveReponse newSuccessInstane = CarPreLeaveReponse.createSuccessResp("success");
+                String response = JSON.toJSONString(newSuccessInstane);
+                out.write(response);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        }
+    }
+
+    private void doHandler(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+        String userAgent = getUserAgent(req);
+        logger.info("UserAgent : {}", userAgent);
+        if (validateUserAgentFormat(userAgent)) {
+            UserAgentInfo userAgentInfo = UserAgentInfo.of(userAgent);
+            BufferedReader br = new BufferedReader(new InputStreamReader(req.getInputStream()));
+            String line = null;
+            StringBuilder sb = new StringBuilder();
+            while ((line = br.readLine()) != null) {
+                sb.append(line);
+            }
+
+            String md5 = userAgentInfo.getMd5();
+            String content = sb.toString();
+            logger.info("Content : {} ,md5{}", content, md5);
+            String result = Decrypt(content, md5);
+            logger.info("Decode result : {}" + result);
+
+            resp.setCharacterEncoding("UTF-8");
+            resp.setContentType("application/json; charset=utf-8");
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                CarPreLeaveReponse newSuccessInstane = CarPreLeaveReponse.createSuccessResp("success");
+                String response = JSON.toJSONString(newSuccessInstane);
+                out.write(response);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        } else {
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                CarPreLeaveReponse newSuccessInstane = CarPreLeaveReponse.createSuccessResp("success");
+                String response = JSON.toJSONString(newSuccessInstane);
+                out.write(response);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        }
+    }
+
+    private String getUserAgent(HttpServletRequest request) {
+        return request.getHeader("User-Agent");
+    }
+
+    public boolean validateUserAgentFormat(String userAgent) {
+        boolean result = false;
+        if (userAgent != null && !"".equals(userAgent)) {
+            //从请求header中取出User-Agent，取出后格式如下{0}_{1}_{2}_{3}
+            int indexOf = userAgent.indexOf('_');
+            if (indexOf != -1) {
+                String[] split = userAgent.split("_");
+                if (split.length == 4) {
+                    String md5 = split[4];
+                    char index = md5.charAt(md5.length() - 1);
+                    if (!Character.isDigit(index)) {
+                        logger.error("Request error,md5 index error {}, {}", md5, index);
+                        return false;
+                    }
+                    return true;
+                } else {
+                    logger.error("Request error,user agent format error {}", userAgent);
+                }
+            } else {
+                logger.error("Request error,can not found underline in user agent {}", userAgent);
+            }
+        }
+
+        return result;
+    }
+
+    // 解密
+    public static String Decrypt(String sSrc, String sKey) throws Exception {
+        try {
+            // 判断Key是否正确
+            if (sKey == null) {
+                System.out.print("Key为空null");
+                return null;
+            }
+            // 判断Key是否为16位
+            if (sKey.length() != 16) {
+                System.out.print("Key长度不是16位");
+                return null;
+            }
+            byte[] raw = sKey.getBytes("utf-8");
+            SecretKeySpec skeySpec = new SecretKeySpec(raw, "AES");
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, skeySpec);
+            byte[] encrypted1 = new BASE64Decoder().decodeBuffer(sSrc);
+            try {
+                byte[] original = cipher.doFinal(encrypted1);
+                String originalString = new String(original, "utf-8");
+                return originalString;
+            } catch (Exception e) {
+                System.out.println(e.toString());
+                return null;
+            }
+        } catch (Exception ex) {
+            System.out.println(ex.toString());
+            return null;
+        }
+    }
+
+    public class DiscountFree {
+
+        private String isFree;
+        private String remark;
+
+        public String getIsFree() {
+            return isFree;
+        }
+
+        public void setIsFree(String isFree) {
+            this.isFree = isFree;
+        }
+
+        public String getRemark() {
+            return remark;
+        }
+
+        public void setRemark(String remark) {
+            this.remark = remark;
+        }
+    }
+
+    public class DiscountMoney {
+
+        private String name;
+        private String remark;
+        private String value;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getRemark() {
+            return remark;
+        }
+
+        public void setRemark(String remark) {
+            this.remark = remark;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
+
+    public class DiscountRate {
+
+        private String name;//名称  string  优惠名称
+        private String remark;//备注  string  备注说明
+        private String value;//折扣率 string  折扣百分比
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getRemark() {
+            return remark;
+        }
+
+        public void setRemark(String remark) {
+            this.remark = remark;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
+
+    public class DiscountTime {
+
+        private String name;//名称  string  优惠名称
+        private String remark;//备注  string  备注说明
+        private String value;//时间值 string  （单位：小时)
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getRemark() {
+            return remark;
+        }
+
+        public void setRemark(String remark) {
+            this.remark = remark;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
+
+    public static class CarPreLeaveVO {
+
+        private String actType;//操作类型    string  [4] （0代表月租长包车辆， 1代表时租访客车辆， 2代表免费车辆， 3代表异常未知车辆）
+        private String arriveTime;//进场时间    string  [20] （必填）（格式：yyyyMMddHHmmss）
+        private String carNum;//车牌号 string  [16] （必填）
+        private DiscountFree discountFree;// 免费优惠    object  
+        private List<DiscountMoney> discountMoney;//金额优惠集合  array<object>   
+        private List<DiscountRate> discountRate;//折扣优惠集合  array<object>   
+        private List<DiscountTime> discountTime;//时间优惠集合  array<object>   
+        private String leaveTime;//出场时间    string  [20] （必填） （格式：yyyyMMddHHmmss）
+        private String parkNum;// 车场账号    string  [20] （必填）（系统为每个停车场分配的编号）
+        private String parkingTimeLength;//停车时长    string  [8] （单位：秒）
+        private String payMoney;//收费金额    string  [8] （必填）
+        private String uid;//工号  string  [12] （停车场端收费管理系统的登录工号）
+        private String watchHouseCode;//岗亭编号    string  [20]
+
+        public String getActType() {
+            return actType;
+        }
+
+        public void setActType(String actType) {
+            this.actType = actType;
+        }
+
+        public String getArriveTime() {
+            return arriveTime;
+        }
+
+        public void setArriveTime(String arriveTime) {
+            this.arriveTime = arriveTime;
+        }
+
+        public String getCarNum() {
+            return carNum;
+        }
+
+        public void setCarNum(String carNum) {
+            this.carNum = carNum;
+        }
+
+        public DiscountFree getDiscountFree() {
+            return discountFree;
+        }
+
+        public void setDiscountFree(DiscountFree discountFree) {
+            this.discountFree = discountFree;
+        }
+
+        public List<DiscountMoney> getDiscountMoney() {
+            return discountMoney;
+        }
+
+        public void setDiscountMoney(List<DiscountMoney> discountMoney) {
+            this.discountMoney = discountMoney;
+        }
+
+        public List<DiscountRate> getDiscountRate() {
+            return discountRate;
+        }
+
+        public void setDiscountRate(List<DiscountRate> discountRate) {
+            this.discountRate = discountRate;
+        }
+
+        public List<DiscountTime> getDiscountTime() {
+            return discountTime;
+        }
+
+        public void setDiscountTime(List<DiscountTime> discountTime) {
+            this.discountTime = discountTime;
+        }
+
+        public String getLeaveTime() {
+            return leaveTime;
+        }
+
+        public void setLeaveTime(String leaveTime) {
+            this.leaveTime = leaveTime;
+        }
+
+        public String getParkNum() {
+            return parkNum;
+        }
+
+        public void setParkNum(String parkNum) {
+            this.parkNum = parkNum;
+        }
+
+        public String getParkingTimeLength() {
+            return parkingTimeLength;
+        }
+
+        public void setParkingTimeLength(String parkingTimeLength) {
+            this.parkingTimeLength = parkingTimeLength;
+        }
+
+        public String getPayMoney() {
+            return payMoney;
+        }
+
+        public void setPayMoney(String payMoney) {
+            this.payMoney = payMoney;
+        }
+
+        public String getUid() {
+            return uid;
+        }
+
+        public void setUid(String uid) {
+            this.uid = uid;
+        }
+
+        public String getWatchHouseCode() {
+            return watchHouseCode;
+        }
+
+        public void setWatchHouseCode(String watchHouseCode) {
+            this.watchHouseCode = watchHouseCode;
+        }
+    }
+
+    public static class CarPreLeaveReponseData {
+
+        private String amountReceivable;//应收金额    string  （单位：元）
+        private String amoutActual;//实收金额    string  （单位：元）
+        private String isOpen;//是否线上控制开闸    string 1：是，2：否
+        private String isPayByLineAmount;//是否按线上返回的金额收费    string  1：是，2：否
+        private String remark;//备注  string  备注说明
+
+        public String getAmountReceivable() {
+            return amountReceivable;
+        }
+
+        public void setAmountReceivable(String amountReceivable) {
+            this.amountReceivable = amountReceivable;
+        }
+
+        public String getAmoutActual() {
+            return amoutActual;
+        }
+
+        public void setAmoutActual(String amoutActual) {
+            this.amoutActual = amoutActual;
+        }
+
+        public String getIsOpen() {
+            return isOpen;
+        }
+
+        public void setIsOpen(String isOpen) {
+            this.isOpen = isOpen;
+        }
+
+        public String getIsPayByLineAmount() {
+            return isPayByLineAmount;
+        }
+
+        public void setIsPayByLineAmount(String isPayByLineAmount) {
+            this.isPayByLineAmount = isPayByLineAmount;
+        }
+
+        public String getRemark() {
+            return remark;
+        }
+
+        public void setRemark(String remark) {
+            this.remark = remark;
+        }
+    }
+
+    public static class CarPreLeaveReponse extends BaseResp {
+
+        private CarPreLeaveReponseData data;
+
+        public CarPreLeaveReponseData getData() {
+            return data;
+        }
+
+        public void setData(CarPreLeaveReponseData data) {
+            this.data = data;
+        }
+
+        public static CarPreLeaveReponse createSuccessResp(String resMsg) {
+            CarPreLeaveReponse resp = new CarPreLeaveReponse();
+            CarPreLeaveReponseData data = new CarPreLeaveReponseData();
+            data.setAmountReceivable("0");
+            data.setAmoutActual("0");
+            data.setIsOpen("2");
+            data.setIsPayByLineAmount("2");
+            data.setRemark("");
+            resp.setResCode(SUCCESS_CODE);
+            resp.setData(data);
+            resp.setResMsg(resMsg);
+            return resp;
+        }
+
+        public static CarPreLeaveReponse createFailtrureResp(String resMsg) {
+            CarPreLeaveReponse resp = new CarPreLeaveReponse();
+            resp.setResCode(FAILURE_CODE);
+            resp.setResMsg(resMsg);
+            return resp;
+        }
+    }
+}
+
+public class APIHttpClient {
+
+    //接口地址
+    private String apiURL = "";
+    private Log logger = LogFactory.getLog(this.getClass());
+    private CloseableHttpClient httpClient = null;
+    private HttpPost method = null;
+    private long startTime = 0L;
+    private long endTime = 0L;
+    private int status = 0;
+
+    private static final String USER_AGENT = "User-Agent";
+
+    /**
+     * 接口地址
+     * 
+     * @param url
+     */
+    public APIHttpClient(String url) {
+        if (url == null || "".equals(url)) {
+            throw new NullPointerException("url can not be null!");
+        }
+        this.apiURL = url;
+        httpClient = HttpClients.createDefault();
+        //            method.setHeader("User-Agent", "kun_/test/test_Nv6RRuGEVvmGjB+jimI/gw==_2aa97c6f8d231f2660d1ea162b38c2dc39e2a59d15c637030b3");
+    }
+
+    public void setHeader(String key, String value) {
+        if (key == null || !"".equals(key)) {
+            throw new NullPointerException("key can not be null");
+        }
+
+        if (value == null || !"".equals(value)) {
+            throw new NullPointerException("value can not be null");
+        }
+
+        method.setHeader(key, value);
+    }
+
+    public void setUserAgent(String value) {
+        if (value == null || !"".equals(value)) {
+            throw new NullPointerException("value can not be null");
+        }
+        method.setHeader(USER_AGENT, value);
+    }
+
+    /**
+     * 调用 API
+     * 
+     * @param parameters
+     * @return
+     */
+    public String doPost(String parameters) {
+        String body = null;
+        logger.info("parameters:" + parameters);
+        if (method != null & parameters != null && !"".equals(parameters.trim())) {
+            try {
+                //配置超时时间
+                RequestConfig requestConfig = RequestConfig.custom().setConnectTimeout(1000).setConnectionRequestTimeout(1000).setSocketTimeout(1000)
+                        .setRedirectsEnabled(true).build();
+                method = new HttpPost(apiURL);
+                method.setConfig(requestConfig);
+                StringEntity entity = new StringEntity(parameters);
+                entity.setContentEncoding("UTF-8");
+                entity.setContentType("application/json");//设置为 json数据
+                method.setEntity(entity);
+                startTime = System.currentTimeMillis();
+                //设置编码  
+                HttpResponse response = httpClient.execute(method);
+                endTime = System.currentTimeMillis();
+                int statusCode = response.getStatusLine().getStatusCode();
+                logger.info("statusCode:" + statusCode);
+                logger.info("调用API 花费时间(单位：毫秒)：" + (endTime - startTime));
+                if (statusCode != HttpStatus.SC_OK) {
+                    logger.error("Method failed:" + response.getStatusLine());
+                    status = 1;
+                }
+
+                //Read the response body
+                body = EntityUtils.toString(response.getEntity());
+
+            } catch (IOException e) {
+                //网络错误
+                status = 3;
+            } finally {
+                try {
+                    httpClient.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return body;
+    }
+
+    public String doGet(String parameters) {
+        String body = null;
+        try {
+            RequestConfig requestConfig = RequestConfig.custom().setConnectTimeout(5000) //设置连接超时时间
+                    .setConnectionRequestTimeout(5000) // 设置请求超时时间
+                    .setSocketTimeout(5000).setRedirectsEnabled(true)//默认允许自动重定向
+                    .build();
+            if (parameters != null) {
+                StringBuilder builder = new StringBuilder();
+                String result = URLEncoder.encode(parameters, "utf-8");
+                builder.append(apiURL).append("/").append(result);
+                apiURL = builder.toString();
+            }
+            HttpGet httpGet = new HttpGet(apiURL);
+            httpGet.setConfig(requestConfig);
+            startTime = System.currentTimeMillis();
+            HttpResponse response = httpClient.execute(httpGet);
+            endTime = System.currentTimeMillis();
+            int statusCode = response.getStatusLine().getStatusCode();
+            logger.info("statusCode:" + statusCode);
+            logger.info("调用API 花费时间(单位：毫秒)：" + (endTime - startTime));
+            if (statusCode != HttpStatus.SC_OK) {
+                logger.error("Method failed:" + response.getStatusLine());
+                status = 1;
+            }
+            //Read the response body
+            body = EntityUtils.toString(response.getEntity());
+
+        } catch (IOException e) {
+            //网络错误
+            status = 3;
+            e.printStackTrace();
+        } finally {
+            try {
+                httpClient.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return body;
+    }
+
+    /**
+     * 0.成功 1.执行方法失败 2.协议错误 3.网络错误
+     * 
+     * @return the status
+     */
+    public int getStatus() {
+        return status;
+    }
+
+    /**
+     * @param status the status to set
+     */
+    public void setStatus(int status) {
+        this.status = status;
+    }
+
+    /**
+     * @return the startTime
+     */
+    public long getStartTime() {
+        return startTime;
+    }
+
+    /**
+     * @return the endTime
+     */
+    public long getEndTime() {
+        return endTime;
+    }
+
+    public static class User {
+
+        private String userName;
+
+        public String getUserName() {
+            return userName;
+        }
+
+        public void setUserName(String userName) {
+            this.userName = userName;
+        }
+    }
+
+    public static void main(String[] args) {
+        //        APIHttpClient client = new APIHttpClient("http://localhost:8983/embed/czyhy/carPreArrive");
+        //        String content = "3pahwLxnh9kMao+UcLU03vuADFR+PNNZI6GnLaEXVdQhPMpFb7l7bBvUScbS9uLOSsWeaD6x/xyqvZQpJRRGygWfL5Btb+xDMUUTzJElqsF/FvZ5jfeyXuokiJFEmmjUkG4npa/ybDjd/y2hR5XTX81+uYzpNdMOG1KJDeKsv1GgQE09da9aZlgImRybzYSXp+8K4Xza8EHnfcl9WGt0J4ssfRVWBO1XW1ASyjFlJE93nKd+gWjsZ5Cw0zoRtvmJldRrgTuaOxEJXL+ROvmjcy8Ktdi3bTGxzEpgtqotlNm/k7OaM5zwn2NUZeUOiIEXHDhjJWDpnYX4lgCXuzGRzwdk1qFVWNzGDppFFtKpldiTppf9MttHzwTSoAHsAXNvdql8MFWPpPMAoKv469X7tYW6IPZ12iCJCv8VqtOPET0LQrnXWzWLezWWMro/B8fI8p695CDP+M+atBfVzl5acw==";
+        //        String result = client.doPost(content);
+        //        System.out.println(result);
+        User user = new User();
+        user.setUserName("testuser000");
+        String str = JSON.toJSONString(user);
+        APIHttpClient client = new APIHttpClient("http://localhost:8983/ipms/subSystem/generate/token");
+        client.doGet(str);
+    }
+}
+
+public class ParkingRecord implements Serializable {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -8030279469925269508L;
+
+    private String id;
+    private String inTime;
+    private String carNum;
+    private String parkingNum;
+    private String startTime;
+    private String endTime;
+    private int status;
+    private String name;
+    private String telphone;
+    private int ordType;
+    private int village;
+    private String version;
+
+    public static final SimpleDateFormat TIME_SDF = new SimpleDateFormat("yyyyMMddHHmmss");
+
+    public static ParkingRecord createOrder() {
+        String uuid = UUID.randomUUID().toString().replaceAll("-", "");
+        ParkingRecord record = new ParkingRecord();
+        record.id = uuid;
+        Date date = new Date();
+        record.inTime = TIME_SDF.format(date);
+        record.carNum = "苏E19KD6";
+        record.parkingNum = "地面-28";
+        record.startTime = TIME_SDF.format(date);
+        long time = date.getTime() + 2 * 60 * 60 * 1000;
+        date.setTime(time);
+        record.endTime = TIME_SDF.format(date);
+        record.status = 1;
+        record.name = "测试";
+        record.telphone = "13913529341";
+        record.ordType = 3;
+        record.village = 12;
+        record.version = "1.0";
+        return record;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getInTime() {
+        return inTime;
+    }
+
+    public void setInTime(String inTime) {
+        this.inTime = inTime;
+    }
+
+    public String getCarNum() {
+        return carNum;
+    }
+
+    public void setCarNum(String carNum) {
+        this.carNum = carNum;
+    }
+
+    public String getParkingNum() {
+        return parkingNum;
+    }
+
+    public void setParkingNum(String parkingNum) {
+        this.parkingNum = parkingNum;
+    }
+
+    public String getStartTime() {
+        return startTime;
+    }
+
+    public void setStartTime(String startTime) {
+        this.startTime = startTime;
+    }
+
+    public String getEndTime() {
+        return endTime;
+    }
+
+    public void setEndTime(String endTime) {
+        this.endTime = endTime;
+    }
+
+    public int getStatus() {
+        return status;
+    }
+
+    public void setStatus(int status) {
+        this.status = status;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getTelphone() {
+        return telphone;
+    }
+
+    public void setTelphone(String telphone) {
+        this.telphone = telphone;
+    }
+
+    public int getOrdType() {
+        return ordType;
+    }
+
+    public void setOrdType(int ordType) {
+        this.ordType = ordType;
+    }
+
+    public int getVillage() {
+        return village;
+    }
+
+    public void setVillage(int village) {
+        this.village = village;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
+    }
+
+    @Override
+    public String toString() {
+        return "ParkingRecord [id=" + id + ", inTime=" + inTime + ", carNum=" + carNum + ", parkingNum=" + parkingNum + ", startTime=" + startTime
+                + ", endTime=" + endTime + ", status=" + status + ", name=" + name + ", telphone=" + telphone + ", ordType=" + ordType + ", village="
+                + village + ", version=" + version + "]";
+    }
+}
+
+public class ParingReserveNotifyServlet extends HttpServlet {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    private static final Logger logger = LoggerFactory.getLogger(ParingReserveNotifyServlet.class);
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        logger.info("####ParingReserveNotifyServlet Do post");
+        try {
+            BufferedReader br = new BufferedReader(new InputStreamReader(req.getInputStream()));
+            String line = null;
+            StringBuilder sb = new StringBuilder();
+            while ((line = br.readLine()) != null) {
+                sb.append(line);
+            }
+
+            String content = sb.toString();
+            logger.info("Content {}", content);
+            ReserveNotifyVO carPreArriveInfo = JSON.parseObject(content, ReserveNotifyVO.class);
+            logger.info("ReserveNotifyVO {}", carPreArriveInfo.toString());
+
+            resp.setCharacterEncoding("UTF-8");
+            resp.setContentType("application/json; charset=utf-8");
+
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                ReserveNotifyResponse response = new ReserveNotifyResponse();
+                response.setSuccess(true);
+                String result = JSON.toJSONString(response);
+                out.write(result);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        } catch (Exception e) {
+            PrintWriter out = null;
+            try {
+                out = resp.getWriter();
+                ReserveNotifyResponse response = new ReserveNotifyResponse();
+                response.setSuccess(true);
+                String result = JSON.toJSONString(response);
+                out.write(result);
+            } finally {
+                if (out != null) {
+                    out.close();
+                }
+            }
+        }
+    }
+
+    public static class ReserveNotifyVO {
+
+        private String devId;
+        private String devName;
+        private String carNum;
+        private String carDirect;
+        private String capTimeStr;
+        private String carImgUrl;
+        private String carNumPic;
+        private String parkingLotCode;
+
+        public String getDevId() {
+            return devId;
+        }
+
+        public void setDevId(String devId) {
+            this.devId = devId;
+        }
+
+        public String getDevName() {
+            return devName;
+        }
+
+        public void setDevName(String devName) {
+            this.devName = devName;
+        }
+
+        public String getCarNum() {
+            return carNum;
+        }
+
+        public void setCarNum(String carNum) {
+            this.carNum = carNum;
+        }
+
+        public String getCarDirect() {
+            return carDirect;
+        }
+
+        public void setCarDirect(String carDirect) {
+            this.carDirect = carDirect;
+        }
+
+        public String getCapTimeStr() {
+            return capTimeStr;
+        }
+
+        public void setCapTimeStr(String capTimeStr) {
+            this.capTimeStr = capTimeStr;
+        }
+
+        public String getCarImgUrl() {
+            return carImgUrl;
+        }
+
+        public void setCarImgUrl(String carImgUrl) {
+            this.carImgUrl = carImgUrl;
+        }
+
+        public String getCarNumPic() {
+            return carNumPic;
+        }
+
+        public void setCarNumPic(String carNumPic) {
+            this.carNumPic = carNumPic;
+        }
+
+        public String getParkingLotCode() {
+            return parkingLotCode;
+        }
+
+        public void setParkingLotCode(String parkingLotCode) {
+            this.parkingLotCode = parkingLotCode;
+        }
+    }
+
+    public static class ReserveNotifyResponse {
+
+        private boolean success;
+        private String errMsg;
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public void setSuccess(boolean success) {
+            this.success = success;
+        }
+
+        public String getErrMsg() {
+            return errMsg;
+        }
+
+        public void setErrMsg(String errMsg) {
+            this.errMsg = errMsg;
+        }
+    }
+}
