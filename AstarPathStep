@@ -1,779 +1,155 @@
-/**
-* name 
-*/
-module gtm {
+package {
 
-    export class AstarPathStep {
+	import laya.display.Stage;
+	import laya.display.Sprite;
+	import laya.events.Event;
+	import laya.map.TiledMap;
+	import laya.maths.Rectangle;
+	import laya.utils.Browser;
+	import laya.utils.Handler;
+	import laya.utils.Stat;
+	import laya.webgl.WebGL;
+	import laya.map.MapLayer;
+	import laya.map.GridSprite;
+	import laya.maths.Point;
+	import PathFinding.core.Grid;
+	import PathFinding.core.Node;
+	import PathFinding.finders.AStarFinder;
+	import PathFinding.finders.JPFAlwaysMoveDiagonally;
+	import PathFinding.core.Heuristic;
 
-        m_tilePos: Laya.Point;
-        m_gScore: number = 0;
-        m_hScore: number = 0;
-        m_parent: AstarPathStep;
-        m_inOpen = false;
-        m_inClose = false;
+	public class LayaSample {
+		
+		private var tiledMap:TiledMap;
+		private var tileWidth:int;
+		private var tileHeight:int;
 
-        public constructor(tilePos: Laya.Point) {
-            this.m_tilePos = tilePos;
-            this.m_parent = null;
-        }
+		public function LayaSample() {
+			// 不支持WebGL时自动切换至Canvas
+			Laya.init(Browser.width, Browser.height, WebGL);
 
-		/**  
-         * 返回这个点的f评分   Astar 权值 F=G+H   
-         * */
-        public fScore(): number {
-            return this.m_gScore + this.m_hScore;
-        }
+			Laya.stage.alignV = Stage.ALIGN_MIDDLE;
+            Laya.stage.alignH = Stage.ALIGN_CENTER;
 
-        /**  
-         * 是同一个AstarPathStep  
-         * */
-        public isEqual(setp: AstarPathStep): boolean {
-            if (this.m_tilePos.x == setp.m_tilePos.x && this.m_tilePos.y == setp.m_tilePos.y) {
-                return true;
-            }
-            return false;
-        }
+            Laya.stage.scaleMode = Stage.SCALE_SHOWALL;
 
-        /**  
-         * 是同一个点  
-         * */
-        public isEqualByPos(pos: Laya.Point): boolean {
-            if (this.m_tilePos.x == pos.x && this.m_tilePos.y == pos.y) {
-                return true;
-            }
-            return false;
-        }
+			Stat.show();
+			
+			createMap();
+		}		
 
-        /**  
-         * 设置为开放节点  
-         * */
-        public setInOpen(flag) {
-            this.m_inOpen = flag;
-        }
+		//创建地图
+		private function createMap():void
+		{
+			//创建地图对象
+			tiledMap = new TiledMap();
+			//创建地图，适当的时候调用destroy销毁地图
+			tiledMap.createMap("res/map/map1.json", new Rectangle(0, 0, Browser.width, Browser.height), new Handler(this, completeHandler));
+		}
 
-        /**  
-         * 设置为关闭节点  
-         * */
-        public setInClose(flag) {
-            this.m_inClose = flag;
-        }
-    }
+		/**
+		 * 地图加载完成的回调
+		 */
+		private function completeHandler(e:*=null):void
+		{
 
-    export class Astar {
+            var blockLayer:MapLayer = this.tiledMap.getLayerByName("Block_Layer");
+            
+			var mapData:Array = blockLayer._mapData;
 
-        private static _instance: Astar;
+            console.log("Map length :" + mapData.length);
 
-        static get instance(): Astar {
-            if (!this._instance) {
-                this._instance = new Astar();
-            }
-            return this._instance;
-        }
+            var objLayer:MapLayer = this.tiledMap.getLayerByName("Objects");
 
-        /**  
-         * 开放节点列表  
-         * */
-        m_openList: Array<AstarPathStep>/* = new Array<AstarPathStep>()*/;
+            var startObj:GridSprite = this.tiledMap.getLayerObject("Objects", "StartPoint");
 
-        /**  
-         * 关闭节点列表  
-         * */
-        m_closeList: gtm.HashMap = new gtm.HashMap();  //<Map>  
+            var startPoint:Point = new Laya.Point(startObj.x,startObj.y);
 
-        /**  
-         * 横向移动一格的评分  
-         * */
-        public static COST_HORIZONTAL = 20;    //根据实际的TileMap定义值  
+			this.tileWidth = this.tiledMap.tileWidth;
+			this.tileHeight = this.tiledMap.tileHeight;
 
-        /**  
-         * 竖向移动一格的路劲评分  
-         * */
-        public static COST_VERTICAL = 10;     //根据实际的TileMap定义值  
+			//start point
+			startPoint = tileCoordForPosition(startPoint);
+			console.log("StartPoint x:" + startPoint.x + ",y :" + startPoint.y);
+			var startScreenPos:Point = new Laya.Point();
+            blockLayer.getScreenPositionByTilePos(startPoint.x,startPoint.y,startScreenPos);
+            //console.log("StartPoint2 ==== >> X :" + startPoint.x + ",Y:" + startPoint.y);
+            var startSprite:Sprite = new Sprite();
+            startSprite.graphics.drawCircle(startScreenPos.x,startScreenPos.y,6,"#00ff00");
+            Laya.stage.addChild(startSprite);
+		
+			console.log(tileHeight + ",h:" + tileHeight);
+			//target point
+  			var targetObj:GridSprite = this.tiledMap.getLayerObject("Objects", "205");
+            
+            var targetSprite:Sprite = new Sprite();
+            targetSprite.graphics.drawCircle(targetObj.x,targetObj.y,6,"#00ff00");
+            Laya.stage.addChild(targetSprite);
 
+            var targetPoint:Point = new Laya.Point(targetObj.x,targetObj.y);
+            targetPoint = tileCoordForPosition(targetPoint);
 
-        /**  
-         * 斜向移动一格的路劲评分  
-         * */
-        public static COST_DIAGONAL = 12;     //根据实际的TileMap定义值  
+			console.log("TargetPoint x:" + targetPoint.x + ",y:" + targetPoint.y);
 
-        public constructor() {
+            var targetScreenPos:Point = new Laya.Point();
+            blockLayer.getScreenPositionByTilePos(targetPoint.x,targetPoint.y,targetScreenPos);
 
-        }
+            var targetSprite1:Sprite = new Sprite();
+            targetSprite1.graphics.drawCircle(targetScreenPos.x,targetScreenPos.y,6,"#00ff00");
+            Laya.stage.addChild(targetSprite1);
 
-        /**  
-        * 地图类对象  
-        * */
-        public tileMap: gtm.TiledMap;
+		    var map_x:int = tiledMap.numColumnsTile;
+			var map_y:int = tiledMap.numRowsTile;
 
-        /**  
-          * 寻路  
-          * */
-        public findPath(startPos: Laya.Point, endPos: Laya.Point, tileMap: gtm.TiledMap) {
+			console.log("map_x :" + map_x + ",map_y :" + map_y);
 
-            this.tileMap = tileMap;//地图  
+			var mapGrid:Grid = new Grid(map_x,map_y);
 
-            var isFind = false;
-
-            var starTime = Laya.Browser.now();//开始寻路的时间  
-            if (PointUtils.distance(endPos, startPos) < 0.5) {
-                // if(Global.logLevel > Global.logLevelInfo) {  
-                //     console.log("You're already there! :P");  
-                // }  
-                return null;
-            }
-
-            if (this.tileMap.isPass(endPos.x, endPos.y) != true) {
-                // if(Global.logLevel > Global.logLevelInfo) {  
-                //     console.log("blocf or beyond the range");  
-                // }  
-                return null;
-            }
-
-            if (!this.m_openList)
-                this.m_openList = new Array<AstarPathStep>();
-
-            this.m_closeList.clear();
-
-            var endStep = new AstarPathStep(endPos);
-            var startStep = new AstarPathStep(startPos);
-
-            startStep.m_hScore = this.getHValue(startStep, endStep);
-            this.insertAndSort(startStep);
-
-            var curStep: AstarPathStep;
-            do {
-                var elapesTime = Laya.Browser.now() - starTime;
-                //                if(elapesTime > 600) {  
-                //                    isFind = false;  
-                //                    //寻路超时  
-                //                    break;  
-                //                }  
-                curStep = this.m_openList.shift();
-                curStep.setInClose(true);
-                curStep.setInOpen(false);
-                this.m_closeList.put(curStep.m_tilePos.x + "_" + curStep.m_tilePos.y, true);
-
-                if (curStep.isEqualByPos(endPos)) {
-                    isFind = true;
-                    break;
-                }
-
-                var arundNodes = this.getAroundsNode(curStep.m_tilePos);
-                for (var i = 0; i < arundNodes.length; i++) {
-                    var onePos = arundNodes[i];
-                    var nextStep = new AstarPathStep(onePos);
-                    var gValue = this.getGValue(curStep, nextStep);
-                    var hValue = this.getHValue(endStep, nextStep);
-
-                    if (nextStep.m_inOpen == true) {
-                        if (gValue < nextStep.m_gScore) {
-                            nextStep.m_gScore = gValue;
-                            nextStep.m_hScore = hValue;
-                            nextStep.m_parent = curStep;
-                            this.findAndSort(nextStep);
-                        }
-                    } else {
-                        nextStep.m_gScore = gValue;
-                        nextStep.m_hScore = hValue;
-                        nextStep.m_parent = curStep; 
-                        this.insertAndSort(nextStep);
-                    }
-                }
-
-            } while (this.m_openList.length > 0);
-
-            if (isFind) {
-                var path = this.createPath(curStep);
-                //this.m_openList = new Array<AstarPathStep>();  
-                this.m_openList.length = 0;
-                this.m_closeList.clear();
-                return path;
-            } else {
-                //this.m_openList = new Array<AstarPathStep>();  
-                this.m_openList.length = 0;
-                this.m_closeList.clear();
-                return null;
-            }
-        }
-
-        public createPath(step: AstarPathStep) {
-            var path: Array<Laya.Point> = new Array<Laya.Point>();
-            do {
-                if (step.m_parent != null) {
-                    var curPos: Laya.Point = step.m_tilePos;
-                    path.unshift(curPos);
-                }
-                step = step.m_parent;
-            } while (step != null)
-            return path;
-        }
-
-        //  
-        private findAndSort(step: AstarPathStep) {
-            var openCount = this.m_openList.length;
-            if (openCount < 1) {
-                return
-            }
-
-            var stepFScore = step.fScore();
-            for (var i = 0; i < openCount; i++) {
-                var oneStep = this.m_openList[i];
-                if (step.isEqual(oneStep) == false) {
-                    if (stepFScore <= oneStep.fScore()) {
-                        this.m_openList.splice(i, 0, step);
-                    }
-                    if (step.isEqual(oneStep)) {
-                        this.m_openList.splice(i, 1);
-                    }
-                }
-            }
-        }
-
-        /**  
-         * 获取G值  
-         * */
-        public getGValue(curStep: AstarPathStep, nextStep: AstarPathStep): number {
-            var extaScore = 0;
-            var curPos = curStep.m_tilePos;
-            var nextPos = nextStep.m_tilePos;
-
-            var G = 0;
-            if (curPos.y == nextPos.y) {//横向移动  
-                G = curStep.m_gScore + Astar.COST_HORIZONTAL;
-            } else if (((curPos.y + 2) == nextPos.y) || ((curPos.y - 2) == nextPos.y)) {
-                G = curStep.m_gScore + Astar.COST_VERTICAL * 2;
-            } else {
-                G = curStep.m_gScore + Astar.COST_DIAGONAL;
-            }
-
-            return G;
-        }
-
-
-        /**  
-         * 获取周围的节点  
-         * */
-        public getAroundsNode(tpt: Laya.Point): Array<Laya.Point> {
-            var aroundNodes: Array<Laya.Point> = new Array();
-            var p: Laya.Point = new Laya.Point();
-            //左下  
-            p = new Laya.Point(tpt.x - 1 + tpt.y % 2, tpt.y + 1);
-            if (this.isWalkable(p) && this.isInClosed(p) == false) {
-                aroundNodes.push(p);
-            }
-            p = new Laya.Point(tpt.x + tpt.y % 2, tpt.y - 1);
-            //右上  
-            if (this.isWalkable(p) && this.isInClosed(p) == false) {
-                aroundNodes.push(p);
-            }
-
-            var p: Laya.Point = new Laya.Point();
-            //下  
-            p.x = tpt.x
-            p.y = tpt.y + 2;
-            if (this.isWalkable(p) && this.isInClosed(p) == false) {
-                aroundNodes.push(p);
-            }
-            //左  
-            p = new Laya.Point(tpt.x - 1, tpt.y);
-            if (this.isWalkable(p) && this.isInClosed(p) == false) {
-                aroundNodes.push(p);
-            }
-            //右  
-            p = new Laya.Point(tpt.x + 1, tpt.y);
-            if (this.isWalkable(p) && this.isInClosed(p) == false) {
-                aroundNodes.push(p);
-            }
-            //上  
-            p = new Laya.Point(tpt.x, tpt.y - 2);
-            if (this.isWalkable(p) && this.isInClosed(p) == false) {
-                aroundNodes.push(p);
-            }
-            p = new Laya.Point(tpt.x - 1 + (tpt.y % 2), tpt.y - 1);
-            //左上  
-            if (this.isWalkable(p) && this.isInClosed(p) == false) {
-                aroundNodes.push(p);
-            }
-            //右下  
-            p = new Laya.Point(tpt.x + (tpt.y % 2), tpt.y + 1);
-            if (this.isWalkable(p) && this.isInClosed(p) == false) {
-                aroundNodes.push(p);
-            }
-            return aroundNodes;
-        }
-
-        public isInClosed(tpt: Laya.Point): boolean {
-            //if(AStarPathFinder.instance.m_closeList.keys.length > 0){  
-            if (this.m_closeList.get(tpt.x + "_" + tpt.y)) {
-                return true;
-            } else {
-                return false;
-            }
-            //        }else{  
-            //            return false;  
-            //        }  
-        }
-
-        public isWalkable(tpt: Laya.Point): boolean {
-            if (this.tileMap.isPass(tpt.x, tpt.y)) {
-                return true;
-            }
-            return false;
-        }
-
-        /**  
-         * 获取H值  
-         * */
-        public getHValue(endStep: AstarPathStep, nextStep: AstarPathStep): number {
-            var to0 = nextStep.m_tilePos.x * Astar.COST_HORIZONTAL + (Math.floor(nextStep.m_tilePos.y) % 2) * Astar.COST_HORIZONTAL / 2;
-            var endTo0 = endStep.m_tilePos.x * Astar.COST_HORIZONTAL + (Math.floor(endStep.m_tilePos.y) % 2) * Astar.COST_HORIZONTAL / 2;
-            return Math.abs(endTo0 - to0) + Math.abs(endStep.m_tilePos.y - nextStep.m_tilePos.y) * Astar.COST_VERTICAL;
-        }
-
-        /**  
-         * 插入  
-         * */
-        private insertAndSort(step: AstarPathStep) {
-            step.setInOpen(true);
-            var stepFScore = step.fScore();
-            var openCount = this.m_openList.length;
-            if (openCount == 0) {
-                this.m_openList.push(step);
-            } else {
-                for (var i = 0; i < openCount; i++) {
-                    var oneStep = this.m_openList[i];
-                    if (stepFScore <= oneStep.fScore()) {
-                        this.m_openList.splice(i, 0, step);
-                        return
-                    }
-                }
-            }
-        }
-
-        /**  
-         * 返回移动方向  
-         * */
-        // public judgeNextDirection(curPos,nextPos): number {  
-        //     var p = new Laya.Point(curPos.x - 1,curPos.y);  
-        //     if(PointUtils.distance(p,nextPos) < 0.1) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_LEFT;  
-        //     }  
-        //     var p = new Laya.Point(curPos.x,curPos.y - 2);  
-        //     if(PointUtils.distance(p,nextPos) < 0.1) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_UP;  
-        //     }  
-        //     var p = new Laya.Point(curPos.x + 1,curPos.y);  
-        //     if(PointUtils.distance(p,nextPos) < 0.1) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_RIGHT;  
-        //     }  
-        //     var p = new Laya.Point(curPos.x,curPos.y + 2);  
-        //     if(PointUtilst.distance(p,nextPos) < 0.1) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_DOWN;  
-        //     }  
-        //     var p = new Laya.Point(curPos.x - 1 + curPos.y % 2,curPos.y - 1);  
-        //     if(PointUtils.distance(p,nextPos) < 0.1) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_UP_LEFT;  
-        //     }  
-        //     var p = new Laya.Point(curPos.x + curPos.y%2,curPos.y - 1);  
-        //     if(PointUtils.distance(p,nextPos) < 0.1) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_UP_RIGHT;  
-        //     }  
-        //     var p = new Laya.Point(curPos.x + curPos.y%2,curPos.y + 1);  
-        //     if(PointUtils.distance(p,nextPos) < 0.1) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_DOWN_RIGHT;  
-        //     }  
-        //     var p = new Laya.Point(curPos.x - 1 + curPos.y%2,curPos.y+1);  
-        //     if(PointUtils.distance(p,nextPos) < 0.1) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_DOWN_LEFT;  
-        //     }  
-        //     console.log("方向解析失败");  
-
-        //     //方向解析失败后直接使用角度进行方向解析  
-        //     var angleSpeed: number = Math.atan2(curPos.y - nextPos.y,curPos.x - nextPos.x);  
-        //     var N = angleSpeed * 180 / Math.PI;  
-        //     if(N <= 20 && N >= -20) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_LEFT;  
-        //     } else if(N <= 110 && N >= 70) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_UP;  
-        //     } else if(N <= -170 || N >= 170) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_RIGHT;  
-        //     } else if(N <= -70 && N >= -110) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_DOWN;  
-        //     } else if(N < 70 && N > 20) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_UP_LEFT;  
-        //     } else if(N < 170 && N > 110) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_UP_RIGHT;  
-        //     } else if(N < -110 && N > -170) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_DOWN_RIGHT;  
-        //     } else if(N < -20 && N > -70) {  
-        //         return EnumManager.DIRECTION_ENUM.DIR_DOWN_LEFT;  
-        //     }  
-        //     return EnumManager.DIRECTION_ENUM.DIR_DOWN;  
-        // }  
-    }
-
-    export class TiledMap {
-		/**网格线 图层*/
-		public lineScene: Laya.Sprite = new Laya.Sprite();
-		/**障碍点 图层*/
-		public pointScene: Laya.Sprite = new Laya.Sprite();
-		public static PATH_UNKNOWN: number = -1;         //未知数据  
-		public static PATH_PASS: number = 0;            // 路径中 0 为可以通过  
-		public static PATH_BARRIER: number = 1;         // 路径中 1 为障碍 
-		public static PATH_TRANSLUCENCE: number = 2;    // 路径中 2 为半透明  
-
-		public TILE_WIDTH: number = 0;           // A*格子宽  
-		public TILE_HEIGHT: number = 0;          // A*格子高  
-		public MAP_WITDTH: number = 0;           // 地图的宽  
-		public MAP_HEIGHT: number = 0;           // 地图的高  
-		public MAP_X: number = 0;                // X坐标最大  
-		public MAP_Y: number = 0;                // Y坐标最大  
-
-        /**  
-         * 得到的地图数据是从0开始的  
-         * */
-		public data: Array<any>;                 //地图数据  
-
-        /**  
-         * object层的数据  
-         * */
-		public objectData: any;
-
-		// 		public constructor(mapData: any) {//json格式的数据  
-		//             for(var count: number = 0,length: number = mapData.length;count < length;count++) {  
-		//                 var lineArr = mapData[count];  
-		//                 this.TILE_WIDTH = parseInt(lineArr["TileWidth"]);  
-		//                 this.TILE_HEIGHT = parseInt(lineArr["TileHeight"]);  
-		//                 this.MAP_WITDTH = parseInt(lineArr["MapWidth"]);  
-		//                 this.MAP_HEIGHT = parseInt(lineArr["MapHeight"]);  
-		//                 this.MAP_X = parseInt(lineArr["X"]);  
-		//                 this.MAP_Y = parseInt(lineArr["Y"]);  
-		//                 var scenePoint = lineArr["data"];  
-		//                 var sArray = new Array();  
-		//                 var msgZu: String[] = scenePoint.split(",");//分割消息  
-		//                 var n: number = 0;  
-		//                 for(var k = 0;k < this.MAP_Y;k++) {//一维长度为i,i为变量，可以根据实际情况改变  
-		//                     sArray[k] = new Array();//声明二维，每一个一维数组里面的一个元素都是一个数组；  
-		//                     for(var j = 0;j < this.MAP_X;j++) {      //一维数组里面每个元素数组可以包含的数量p，p也是一个变量；  
-		//                         sArray[k][j] = msgZu[n];       //这里将变量初始化，我这边统一初始化为空，后面在用所需的值覆盖里面的值  
-		//                         n += 1;  
-		//                     }  
-		//                 }  
-		//                 this.data = sArray;  
-		//                 this.objectData = lineArr["object"];  
-		// //                this.drawTile();  
-		// //                this.drawPo();  
-		//             }  
-		//         }
-
-		public constructor(tilemap: Laya.TiledMap) {
-			this.TILE_WIDTH = tilemap.tileWidth;
-			this.TILE_HEIGHT = tilemap.tileHeight;
-			this.MAP_WITDTH = tilemap.width;
-			this.MAP_HEIGHT = tilemap.height;
-			this.MAP_X = tilemap.numRowsTile;
-			this.MAP_Y = tilemap.numColumnsTile;
-
-			var blockLayer = tilemap.getLayerByName("Block_Layer");
-
-			var mapData = blockLayer._mapData;
-			var sArray = new Array();  
-			var n: number = 0;
-			for (var k = 0; k < this.MAP_Y; k++) {//一维长度为i,i为变量，可以根据实际情况改变  
-				sArray[k] = new Array();//声明二维，每一个一维数组里面的一个元素都是一个数组；  
-				for (var j = 0; j < this.MAP_X; j++) {      //一维数组里面每个元素数组可以包含的数量p，p也是一个变量；  
-					sArray[k][j] = mapData[n];       //这里将变量初始化，我这边统一初始化为空，后面在用所需的值覆盖里面的值 
-					if (k == 14 && j == 8) {
-						console.log("============== >> " + mapData[n]);
-					} 
-					n += 1;
+			var i:int, j:int,n:int;
+			for (i = 0; i < map_y; ++i)
+			{
+				for (j = 0; j < map_x; ++j)
+				{
+					var wallk:int = mapData[n];
+					var walkable:Boolean = wallk != 1 ? true : false;
+					mapGrid.setWalkableAt(j,i,walkable);
+					var node:Node = mapGrid.getNodeAt(j,i);
+				    console.log("Node x:" + node.x + ",y:" + node.y + ",wallkable:" + walkable);
+					++n;
 				}
 			}
-			this.data = sArray;
-
-	        //this.drawTile();  
-		    //this.drawPo(); 
-			Laya.stage.addChild(this.lineScene);
-			Laya.stage.addChild(this.pointScene);
-
-			// var sArray = new Array();  
-			//     var msgZu: String[] = scenePoint.split(",");//分割消息  
-			//     var n: number = 0;  
-			//     for(var k = 0;k < this.MAP_Y;k++) {//一维长度为i,i为变量，可以根据实际情况改变  
-			//         sArray[k] = new Array();//声明二维，每一个一维数组里面的一个元素都是一个数组；  
-			//         for(var j = 0;j < this.MAP_X;j++) {      //一维数组里面每个元素数组可以包含的数量p，p也是一个变量；  
-			//             sArray[k][j] = msgZu[n];       //这里将变量初始化，我这边统一初始化为空，后面在用所需的值覆盖里面的值  
-			//             n += 1;  
-			//         }  
-			//     }  
-			//     this.data = sArray;  
-			// }  
+			
+			var finder:JPFAlwaysMoveDiagonally = new JPFAlwaysMoveDiagonally({allowDiagonal: true,dontCrossCorners: true,heuristic:Heuristic.manhattan});
+			var paths:Array = finder.findPath(startPoint.x,startPoint.y,targetPoint.x,targetPoint.y,mapGrid);
+			var pathPath:int = paths.length;
+            var pathPoint:Sprite;
+			console.log("Path length :" + paths.length);
+            for (var index:int = 0;index < pathPath;index ++) {
+				var point:Point = new Point(paths[index][0],paths[index][1]);
+				console.log("============= :" + paths[index][0] + ",y :" + paths[index][1]);
+				
+                pathPoint = new Laya.Sprite();
+                
+                var nodeScreenPos:Point = new Laya.Point();
+                blockLayer.getScreenPositionByTilePos(point.x,point.y,nodeScreenPos);
+                pathPoint.graphics.drawCircle(nodeScreenPos.x,nodeScreenPos.y,6,"#ff0000");
+                Laya.stage.addChild(pathPoint);
+                //console.log("X:" + point.x + ",y :" + point.y + ",index :" + index + ",ScreenPosX:" + nodeScreenPos.x + ",ScreenPosY :" +　nodeScreenPos.y);
+            }
 		}
 
-        /**  
-         * 清空地图数据  
-         * */
-		public dispose() {
-			this.TILE_WIDTH = 0;
-			this.TILE_HEIGHT = 0;
-			this.MAP_WITDTH = 0;
-			this.MAP_HEIGHT = 0;
-			this.data = null;
+		public function tileCoordForPosition(point:Point):Point
+		{
+    		// Size mapSize = tiledMap->getMapSize(); 
+    		// Size tileSize = tiledMap->getTileSize();
+    		// int x = position.x / tileSize.width;
+    		// int y = (mapSize.height*tileSize.height - position.y) / tileSize.height;
+    		// return Vec2(x, y);
+    		var x = Math.floor(point.x / this.tileWidth);
+			var y = Math.floor(point.y / this.tileHeight);
+    		//var y =  Math.floor((this.MAP_Y * this.TILE_HEIGHT - point.y) / this.TILE_HEIGHT);
+    		return new Laya.Point(x,y);
 		}
 
-		/**   
-		* 判断A*地图从标是否可以通过的路 true 为可以通过   
-		*/
-		public isPass(checkX: number, checkY: number): boolean {
-			try {
-				var mapWidth: number = this.MAP_X;
-				var mapHeight: number = this.MAP_Y;
-				if (checkX < 0 || checkX >= mapWidth || checkY < 0 || checkY >= mapHeight) {
-					return false;
-				}
-				if (checkX == 8 && checkY == 14) {
-                	console.log("8-14 :" + this.data[checkY][checkX]);
-            	}
-				return this.data[checkY][checkX] != gtm.TiledMap.PATH_BARRIER ? true : false;
-			} catch (e) {
-				console.warn("in IsPass " + e.toString());
-				return false;
-			}
-			//return false;  
-		}
-
-		/**   
-         * 判断地图上改点是否是透明点   
-         */
-		public isOpacity(checkX: number, checkY: number): boolean {
-			var mapWidth: number = this.MAP_X;
-			var mapHeight: number = this.MAP_Y;
-			if (checkX < 0 || checkX >= mapWidth || checkY < 0 || checkY >= mapHeight) {
-				return false;
-			}
-			return this.data[checkY][checkX] == gtm.TiledMap.PATH_TRANSLUCENCE;
-		}
-
-	    /**  
-         * 像素坐标转换为地图坐标  
-         * */
-		public SpaceToTiled(point: Laya.Point): Laya.Point {
-			var y = Math.floor(point.y * 2 / this.TILE_HEIGHT) * this.TILE_HEIGHT / 2;
-			var x = Math.floor(point.x * 2 / this.TILE_WIDTH) * this.TILE_WIDTH / 2;
-
-			//            var center: egret.Shape = new egret.Shape();  
-			//            center.graphics.lineStyle(2,0xff00ff);  
-			//            center.graphics.drawCircle(0,0,2);  
-			//            center.graphics.endFill();  
-
-			//            center.x = x;  
-			//            center.y = y;  
-			//            this.pointScene.addChild(center);  
-			var leftPos: Laya.Point = new Laya.Point();
-			var rightPos: Laya.Point = new Laya.Point();
-			//console.log("x = " + Math.floor(point.x * 2 / this.TILE_WIDTH) + " y = " + Math.floor(point.y * 2 / this.TILE_HEIGHT))  
-			if ((Math.floor(point.y * 2 / this.TILE_HEIGHT) % 2 == 0 && Math.floor(point.x * 2 / this.TILE_WIDTH) % 2 == 0) || (Math.floor(point.y * 2 / this.TILE_HEIGHT) % 2 == 1 && Math.floor(point.x * 2 / this.TILE_WIDTH) % 2 == 1)) {
-				//表示定点在真确的tile中心点，只需要再花一个右下角的点  
-				//                var center1: egret.Shape = new egret.Shape();  
-				//                center1.graphics.lineStyle(2,0xffffff);  
-				//                center1.graphics.drawCircle(0,0,2);  
-				//                center1.graphics.endFill();  
-				//                center1.x = x + this.TILE_WIDTH / 2;  
-				//                center1.y = y + this.TILE_HEIGHT / 2;  
-				//                this.pointScene.addChild(center1);  
-
-				leftPos.x = x;
-				leftPos.y = y;
-				rightPos.x = x + this.TILE_WIDTH / 2;
-				rightPos.y = y + this.TILE_HEIGHT / 2;
-			} else {
-				//                var center1: egret.Shape = new egret.Shape();  
-				//                center1.graphics.lineStyle(2,0xffffff);  
-				//                center1.graphics.drawCircle(0,0,2);  
-				//                center1.graphics.endFill();  
-				//                center1.x = x;  
-				//                center1.y = y + this.TILE_HEIGHT / 2;  
-				//                this.pointScene.addChild(center1);  
-
-				//                var center2: egret.Shape = new egret.Shape();  
-				//                center2.graphics.lineStyle(2,0xffffff);  
-				//                center2.graphics.drawCircle(0,0,2);  
-				//                center2.graphics.endFill();  
-				//                center2.x = x + this.TILE_WIDTH / 2;  
-				//                center2.y = y;  
-				//                this.pointScene.addChild(center2);  
-
-				leftPos.x = x;
-				leftPos.y = y + this.TILE_HEIGHT / 2;
-				rightPos.x = x + this.TILE_WIDTH / 2;
-				rightPos.y = y;
-			}
-
-			if (PointUtils.distance(leftPos, point) <= PointUtils.distance(rightPos, point)) {
-                /*if (Global.isRelease == false)  
-                {  
-                    var center: egret.Shape = new egret.Shape();  
-                    center.graphics.lineStyle(2,0xffffff);  
-                    center.graphics.drawCircle(0,0,2);  
-                    center.graphics.endFill();  
-                    center.x = leftPos.x;  
-                    center.y = leftPos.y;  
-                    this.pointScene.addChild(center);  
-                }*/
-				return new Laya.Point(Math.round(leftPos.x / this.TILE_WIDTH) - 1, leftPos.y * 2 / this.TILE_HEIGHT - 1);
-			} else {
-                /*var center: egret.Shape = new egret.Shape();  
-                center.graphics.lineStyle(2,0xffffff);  
-                center.graphics.drawCircle(0,0,2);  
-                center.graphics.endFill();  
-                center.x = rightPos.x;  
-                center.y = rightPos.y;  
-                this.pointScene.addChild(center);  
-                */
-				return new Laya.Point(Math.round(rightPos.x / this.TILE_WIDTH) - 1, rightPos.y * 2 / this.TILE_HEIGHT - 1);
-			}
-		}
-
-		/**  
-         * tile坐标转为像素坐标  
-         * */
-		public TiledToSpace(point: Laya.Point): Laya.Point {
-			var y = this.TILE_HEIGHT * (point.y + 1) / 2;
-			var x = (point.x + ((point.y) % 2 / 2.0) + 0.5) * this.TILE_WIDTH;
-			return new Laya.Point(x, y);
-		}
-
-		public drawTile() {
-			var n1: number = this.TILE_HEIGHT / 2;
-			var n2: number = this.TILE_WIDTH / 2;
-
-			var m1: number = Math.round(this.MAP_HEIGHT / this.TILE_HEIGHT * 2);
-
-			for (var i: number = 0; i < m1; i++) {
-				this.line_A(n2, 0, 0, n1);
-				this.line_A(0, this.MAP_HEIGHT - n1, n2, this.MAP_HEIGHT);
-				n1 += this.TILE_HEIGHT;
-				n2 += this.TILE_WIDTH;
-			}
-		}
-
-		private line_A(a: number, b: number, c: number, d: number): void {
-			var sp = new Laya.Sprite();
-			//画直线
-			sp.graphics.drawLine(a, b, c, d, "#ff0000", 1);
-			this.lineScene.addChild(sp);
-		}
-
-		public drawPo() {
-			for (var i = 0; i < this.MAP_Y; i++) {
-				for (var j = 0; j < this.MAP_X; j++) {
-					var t = this.data[i][j];
-					if (parseInt(t) != gtm.TiledMap.PATH_PASS) {
-						var center = new Laya.Sprite();
-						//画中心点  
-						if (parseInt(t) == gtm.TiledMap.PATH_BARRIER) {
-								center.graphics.drawCircle(0, 0, 6,"#ff0000");
-						} else if (parseInt(t) == gtm.TiledMap.PATH_TRANSLUCENCE) {
-							center.graphics.drawCircle(0, 0, 6,"#ff0001");
-						}
-						var sPos = this.TiledToSpace(new Laya.Point(j, i));
-						center.x = sPos.x;
-						center.y = sPos.y;
-						this.pointScene.addChild(center);
-					}
-				}
-			}
-		}
 	}
-}
-
-namespace gtm {
-    /**
-     * The HashObject class is the base class for all objects in the Egret framework.The HashObject
-     * class includes a hashCode property, which is a unique identification number of the instance.
-     * @version Egret 2.4
-     * @platform Web,Native
-     * @language en_US
-     */
-    /**
-     * Egret顶级对象。框架内所有对象的基类，为对象实例提供唯一的hashCode值。
-     * @version Egret 2.4
-     * @platform Web,Native
-     * @language zh_CN
-     */
-    export interface IHashObject {
-        /**
-         * a unique identification number assigned to this instance.
-         * @version Egret 2.4
-         * @platform Web,Native
-         * @readOnly
-         * @language en_US
-         */
-        /**
-         * 返回此对象唯一的哈希值,用于唯一确定一个对象。hashCode为大于等于1的整数。
-         * @version Egret 2.4
-         * @platform Web,Native
-         * @readOnly
-         * @language zh_CN
-         */
-        hashCode:number;
-    }
-
-    /**
-     * @private
-     * 哈希计数
-     */
-    export let $hashCount:number = 1;
-
-    /**
-     * The HashObject class is the base class for all objects in the Egret framework.The HashObject
-     * class includes a hashCode property, which is a unique identification number of the instance.
-     * @version Egret 2.4
-     * @platform Web,Native
-     * @language en_US
-     */
-    /**
-     * Egret顶级对象。框架内所有对象的基类，为对象实例提供唯一的hashCode值。
-     * @version Egret 2.4
-     * @platform Web,Native
-     * @language zh_CN
-     */
-    export class HashObject implements IHashObject{
-
-        /**
-         * Initializes a HashObject
-         * @version Egret 2.4
-         * @platform Web,Native
-         * @language en_US
-         */
-        /**
-         * 创建一个 HashObject 对象
-         * @version Egret 2.4
-         * @platform Web,Native
-         * @language zh_CN
-         */
-        public constructor() {
-            this.$hashCode = $hashCount++;
-        }
-
-        /**
-         * @private
-         */
-        $hashCode:number;
-        /**
-         * a unique identification number assigned to this instance.
-         * @version Egret 2.4
-         * @platform Web,Native
-         * @language en_US
-         */
-        /**
-         * 返回此对象唯一的哈希值,用于唯一确定一个对象。hashCode为大于等于1的整数。
-         * @version Egret 2.4
-         * @platform Web,Native
-         * @language zh_CN
-         */
-        public get hashCode():number {
-            return this.$hashCode;
-        }
-    }
 }
