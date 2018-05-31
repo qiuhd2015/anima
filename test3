@@ -1,132 +1,20 @@
-<script>
+startTimeChecked = selectedVal;
+now = new Date(startTimeChecked[0],startTimeChecked[1] - 1,startTimeChecked[2],startTimeChecked[3],startTimeChecked[4]);
+$('#port_publish_start_time').text(DateUtil.format(now,"yyyy/MM/dd hh:mm"));
+$('#port_publish_setting_start_date').text(DateUtil.format(now,"yyyy年MM月dd日"));
+$('#port_publish_setting_start_time').text(DateUtil.format(now,"hh:mm"));
 
-$('#port_publish_modal').on('modalload', function() {
-	var params = A.Component.params(this);
-	var id = params.id;
-	var carport = params.carport;
-	var lot = params.lot;
-	var whole = params.whole;
-	var rule = params.rule;
-	console.log(rule);
-	$("#priceRule").text(rule);
-	if (whole == 1) {
-		$('#whole_checkbox').prop("checked",true);
-	}
-	
-	$('#port_publish_carport').text(carport);
-	$('#port_publish_lot').text(lot);
-	var now = new Date();
-	$('#port_publish_start_time').text(DateUtil.format(now,"yyyy/MM/dd hh:mm"));
-	$('#port_publish_setting_start_date').text(DateUtil.format(now,"yyyy年MM月dd日"));
-	$('#port_publish_setting_start_time').text(DateUtil.format(now,"hh:mm"));
-	var nowYear = now.getFullYear(), nowMonth = now.getMonth() + 1,nowDate = now.getDate(),nowHours = now.getHours(),nowMins = now.getMinutes();
-	var startTimeChecked = [nowYear,nowMonth,nowDate,nowHours,nowMins];
-	//发布时间不低于2个小时
-	var curTimeMills = now.getTime();
-	var addTimeMills = curTimeMills + 7200000;
-	now.setTime(addTimeMills);
-	$('#port_publish_end_time').text(DateUtil.format(now,"yyyy/MM/dd hh:mm"));
-	$('#port_publish_setting_end_date').text(DateUtil.format(now,"yyyy年MM月dd日"));
-	$('#port_publish_setting_end_time').text(DateUtil.format(now,"hh:mm"));
-	nowYear = now.getFullYear(), nowMonth = now.getMonth() + 1,nowDate = now.getDate(),nowHours = now.getHours(),nowMins = now.getMinutes();
-	var endTimeChecked = [nowYear,nowMonth,nowDate,nowHours,nowMins];
-	
-	
-	$('#port_publish_setting_start_btn').unbind();
-	$('#port_publish_setting_start_btn').on(A.options.clickEvent, function() {
-		init(startTimeChecked[0],startTimeChecked[1],startTimeChecked[2],startTimeChecked[3],startTimeChecked[4]);
-		var picker = new Picker({
-			data: [first, second, third, four, five],
-			selectedIndex: selectedIndex,
-			title: '选择时间'
-		});
-		picker.on('picker.select', function(selectedVal, selectedIndex) {
-			startTimeChecked = selectedVal;
-			now = new Date(startTimeChecked[0],startTimeChecked[1] - 1,startTimeChecked[2],startTimeChecked[3],startTimeChecked[4]);
-			$('#port_publish_start_time').text(DateUtil.format(now,"yyyy/MM/dd hh:mm"));
-			$('#port_publish_setting_start_date').text(DateUtil.format(now,"yyyy年MM月dd日"));
-			$('#port_publish_setting_start_time').text(DateUtil.format(now,"hh:mm"));
-		});
-		picker.show();
-	});
-	
-	$('#port_publish_setting_end_btn').unbind();
-	$('#port_publish_setting_end_btn').on(A.options.clickEvent, function() {
-		init(endTimeChecked[0],endTimeChecked[1],endTimeChecked[2],endTimeChecked[3],endTimeChecked[4]);
-		var picker = new Picker({
-			data: [first, second, third, four, five],
-			selectedIndex: selectedIndex,
-			title: '选择时间'
-		});
-		picker.on('picker.select', function(selectedVal, selectedIndex) {
-			var month = endTimeChecked[1];
-			endTimeChecked = selectedVal;
-			console.log("selectMonth:" + endTimeChecked[1]);
-			var now1 = new Date(endTimeChecked[0],endTimeChecked[1] - 1,endTimeChecked[2],endTimeChecked[3],endTimeChecked[4]);
-			console.log(now1.getMonth());
-			$('#port_publish_end_time').text(DateUtil.format(now1,"yyyy/MM/dd hh:mm"));
-			$('#port_publish_setting_end_date').text(DateUtil.format(now1,"yyyy年MM月dd日"));
-			$('#port_publish_setting_end_time').text(DateUtil.format(now1,"hh:mm"));
-		});
-		picker.show();
-	});
-	
-	$('#port_publish_submit_btn').unbind();
-	$('#port_publish_submit_btn').on(A.options.clickEvent, function() {
-		if (!$('#whole_checkbox').is(':checked') && whole ==1) {
-			$('#whole_checkbox').prop("checked",true);
-			return A.alert("停车场只支持整出租");
-		}
-		if ($('#whole_checkbox').is(':checked')) {
-			whole = 1;
-		}else {
-			whole = 0;
-		}
+var month = endTimeChecked[1];
+endTimeChecked = selectedVal;
+var now1 = new Date(endTimeChecked[0],endTimeChecked[1] - 1,endTimeChecked[2],endTimeChecked[3],endTimeChecked[4]);
+console.log(now1.getMonth());
+$('#port_publish_end_time').text(DateUtil.format(now1,"yyyy/MM/dd hh:mm"));
+$('#port_publish_setting_end_date').text(DateUtil.format(now1,"yyyy年MM月dd日"));
+$('#port_publish_setting_end_time').text(DateUtil.format(now1,"hh:mm"))
 
-		now = new Date(startTimeChecked[0],startTimeChecked[1] - 1,startTimeChecked[2],startTimeChecked[3],startTimeChecked[4]);
-		var startTime = DateUtil.format(now,"yyyy-MM-dd hh:mm");
-		var starTimeMills = now.getTime();
+now = new Date(startTimeChecked[0],startTimeChecked[1] - 1,startTimeChecked[2],startTimeChecked[3],startTimeChecked[4]);
+var startTime = DateUtil.format(now,"yyyy-MM-dd hh:mm");
+var starTimeMills = now.getTime();
 		
-		var hours = endTimeChecked[3];
-		now = new Date(endTimeChecked[0],endTimeChecked[1] - 1,endTimeChecked[2],hours,endTimeChecked[4]);
-		var endTime = DateUtil.format(now,"yyyy-MM-dd hh:mm");
-		var endTimeMills = now.getTime();		
-		if (endTimeMills - starTimeMills < 7200000) {
-			return A.showToast('出租时间不低于两个小时');			
-		}
-		var cost = 0;
-		if ($('#port_publish_submit_btn').prop("disabled") == true) {
-			return;
-		}
-		$('#port_publish_submit_btn').attr("disabled", true);
-
-		if ((hours >= 21 && hours <= 24) || hours >= 0 && hours <= 8) {
-			A.confirm('温馨提示','建议合理安排结束时间，避免租用人挪车不及时、带来不必要的麻烦!',
-				function() {
-					showLoading();
-					publishPort(id,startTime,endTime,cost,whole,function(result){
-						$('#port_publish_submit_btn').attr("disabled",false);
-						hideLoading();
-						if (result.success) {
-							A.Controller.back();
-						}else {
-							A.showToast(result.msg);
-						}
-					});
-				}
-			);
-		}else {
-			showLoading();
-			publishPort(id,startTime,endTime,cost,whole,function(result){
-				$('#port_publish_submit_btn').attr("disabled",false);
-				hideLoading();
-				if (result.success) {
-					A.Controller.back();
-				}else {
-					A.showToast(result.msg);
-				}
-			});
-		}
-	});
-});
-</script>
+var hours = endTimeChecked[3];
+now = new Date(endTimeChecked[0],endTimeChecked[1] - 1,endTimeChecked[2],hours,endTimeChecked[4]);
