@@ -1,0 +1,209 @@
+<div id="port_publish_modal" data-role="modal" data-cache="false" class="modal">
+	<header>
+		<div class="titlebar reverse1">
+			<a id="backBtn" class="left" data-toggle="back" href="#">
+				<i class="icon icon-arrowleft white size30"></i>
+			</a>
+			<h1 class="text-center white">发布车位</h1>
+		</div>
+	</header>
+	<article id="parking_article" data-role="article" class="active" style="top:44px">
+		<div class="scroller">
+			<ul class="list noclick">
+				<li>
+					<div class="justify-content box box-middle">
+						<p id="port_publish_lot"></p>
+						<span id="port_publish_carport" class="lrpadding8 color-2"></span>
+					</div>
+				</li>
+			</ul>
+			<ul class="list noclick">
+				<li>
+					<div class="justify-content">
+						<span>出租时间为 :</span>
+						<span id="port_publish_start_time"></span> - <span id="port_publish_end_time"></span>
+					</div>
+				</li>
+			</ul>
+			<ul class="list noclick">
+				<li class="bg-clouds">
+					<div class="justify text-center" style="padding-left: 40px;">
+						<a class="color-2 size40"><i class="icon icon-time"></i></a>
+						<p style="padding-top: 5px;">开始时间</p>
+					</div>
+					<div class="justify-content text-center">
+						<p id="port_publish_setting_start_date" class="bold"></p>
+						<p id="port_publish_setting_start_time" class="bold margin4" style="font-size: 18px;"></p>
+					</div>
+					<div class="justify box box-middle" style="padding-right: 40px;">
+						<span id="port_publish_setting_start_btn" class="mark-info">设置时间</span>
+					</div>
+				</li>
+				<li class="bg-clouds">
+					<div class="justify text-center" style="padding-left: 40px;">
+						<a class="color-2 size40"><i class="icon icon-time"></i></a>
+						<p class="margin8">结束时间</p>
+					</div>
+					<div class="justify-content text-center">
+						<p id="port_publish_setting_end_date" class="bold"></p>
+						<p id="port_publish_setting_end_time" class="bold margin4" style="font-size: 18px;"></p>
+					</div>
+					<div class="justify box box-middle" style="padding-right: 40px;">
+						<span id="port_publish_setting_end_btn" class="mark-success">设置时间</span>
+					</div>
+				</li>
+			</ul>
+			<ul class="list noclick">
+				<li>
+					<div class="justify-content">
+						<span>我要整出租 </span>
+					</div>
+					<div class="justify" style="padding-right:20px">
+						<input id="whole_checkbox" type="checkbox"/>
+					</div>
+				</li>
+			</ul>
+			<div class="padding12">
+				<small>
+					<span>收费标准:</span>
+					<span id="priceRule" class="color-2"></span>
+				</small>
+			</div>
+			<div style="margin:10px; padding-top: 10px;">
+				<button id="port_publish_submit_btn" class="width-full radius4">确认出租</button>
+			</div>
+		</div>
+	</article>
+</div>
+<script>
+
+$('#port_publish_modal').on('modalload', function() {
+	var params = A.Component.params(this);
+	var id = params.id;
+	var carport = params.carport;
+	var lot = params.lot;
+	var whole = params.whole;
+	var rule = params.rule;
+	console.log(rule);
+	$("#priceRule").text(rule);
+	if (whole == 1) {
+		$('#whole_checkbox').prop("checked",true);
+	}
+	
+	$('#port_publish_carport').text(carport);
+	$('#port_publish_lot').text(lot);
+	var now = new Date();
+	$('#port_publish_start_time').text(DateUtil.format(now,"yyyy/MM/dd hh:mm"));
+	$('#port_publish_setting_start_date').text(DateUtil.format(now,"yyyy年MM月dd日"));
+	$('#port_publish_setting_start_time').text(DateUtil.format(now,"hh:mm"));
+	var nowYear = now.getFullYear(), nowMonth = now.getMonth() + 1,nowDate = now.getDate(),nowHours = now.getHours(),nowMins = now.getMinutes();
+	var startTimeChecked = [nowYear,nowMonth,nowDate,nowHours,nowMins];
+	//发布时间不低于2个小时
+	var curTimeMills = now.getTime();
+	var addTimeMills = curTimeMills + 7200000;
+	now.setTime(addTimeMills);
+	$('#port_publish_end_time').text(DateUtil.format(now,"yyyy/MM/dd hh:mm"));
+	$('#port_publish_setting_end_date').text(DateUtil.format(now,"yyyy年MM月dd日"));
+	$('#port_publish_setting_end_time').text(DateUtil.format(now,"hh:mm"));
+	nowYear = now.getFullYear(), nowMonth = now.getMonth() + 1,nowDate = now.getDate(),nowHours = now.getHours(),nowMins = now.getMinutes();
+	var endTimeChecked = [nowYear,nowMonth,nowDate,nowHours,nowMins];
+	
+	
+	$('#port_publish_setting_start_btn').unbind();
+	$('#port_publish_setting_start_btn').on(A.options.clickEvent, function() {
+		init(startTimeChecked[0],startTimeChecked[1],startTimeChecked[2],startTimeChecked[3],startTimeChecked[4]);
+		var picker = new Picker({
+			data: [first, second, third, four, five],
+			selectedIndex: selectedIndex,
+			title: '选择时间'
+		});
+		picker.on('picker.select', function(selectedVal, selectedIndex) {
+			startTimeChecked = selectedVal;
+			now = new Date(startTimeChecked[0],startTimeChecked[1] - 1,startTimeChecked[2],startTimeChecked[3],startTimeChecked[4]);
+			$('#port_publish_start_time').text(DateUtil.format(now,"yyyy/MM/dd hh:mm"));
+			$('#port_publish_setting_start_date').text(DateUtil.format(now,"yyyy年MM月dd日"));
+			$('#port_publish_setting_start_time').text(DateUtil.format(now,"hh:mm"));
+		});
+		picker.show();
+	});
+	
+	$('#port_publish_setting_end_btn').unbind();
+	$('#port_publish_setting_end_btn').on(A.options.clickEvent, function() {
+		init(endTimeChecked[0],endTimeChecked[1],endTimeChecked[2],endTimeChecked[3],endTimeChecked[4]);
+		var picker = new Picker({
+			data: [first, second, third, four, five],
+			selectedIndex: selectedIndex,
+			title: '选择时间'
+		});
+		picker.on('picker.select', function(selectedVal, selectedIndex) {
+			var month = endTimeChecked[1];
+			endTimeChecked = selectedVal;
+			console.log("selectMonth:" + endTimeChecked[1]);
+			var now1 = new Date(endTimeChecked[0],endTimeChecked[1] - 1,endTimeChecked[2],endTimeChecked[3],endTimeChecked[4]);
+			console.log(now1.getMonth());
+			$('#port_publish_end_time').text(DateUtil.format(now1,"yyyy/MM/dd hh:mm"));
+			$('#port_publish_setting_end_date').text(DateUtil.format(now1,"yyyy年MM月dd日"));
+			$('#port_publish_setting_end_time').text(DateUtil.format(now1,"hh:mm"));
+		});
+		picker.show();
+	});
+	
+	$('#port_publish_submit_btn').unbind();
+	$('#port_publish_submit_btn').on(A.options.clickEvent, function() {
+		if (!$('#whole_checkbox').is(':checked') && whole ==1) {
+			$('#whole_checkbox').prop("checked",true);
+			return A.alert("停车场只支持整出租");
+		}
+		if ($('#whole_checkbox').is(':checked')) {
+			whole = 1;
+		}else {
+			whole = 0;
+		}
+
+		now = new Date(startTimeChecked[0],startTimeChecked[1] - 1,startTimeChecked[2],startTimeChecked[3],startTimeChecked[4]);
+		var startTime = DateUtil.format(now,"yyyy-MM-dd hh:mm");
+		var starTimeMills = now.getTime();
+		
+		var hours = endTimeChecked[3];
+		now = new Date(endTimeChecked[0],endTimeChecked[1] - 1,endTimeChecked[2],hours,endTimeChecked[4]);
+		var endTime = DateUtil.format(now,"yyyy-MM-dd hh:mm");
+		var endTimeMills = now.getTime();		
+		if (endTimeMills - starTimeMills < 7200000) {
+			return A.showToast('出租时间不低于两个小时');			
+		}
+		var cost = 0;
+		if ($('#port_publish_submit_btn').prop("disabled") == true) {
+			return;
+		}
+		$('#port_publish_submit_btn').attr("disabled", true);
+
+		if ((hours >= 21 && hours <= 24) || hours >= 0 && hours <= 8) {
+			A.confirm('温馨提示','建议合理安排结束时间，避免租用人挪车不及时、带来不必要的麻烦!',
+				function() {
+					showLoading();
+					publishPort(id,startTime,endTime,cost,whole,function(result){
+						$('#port_publish_submit_btn').attr("disabled",false);
+						hideLoading();
+						if (result.success) {
+							A.Controller.back();
+						}else {
+							A.showToast(result.msg);
+						}
+					});
+				}
+			);
+		}else {
+			showLoading();
+			publishPort(id,startTime,endTime,cost,whole,function(result){
+				$('#port_publish_submit_btn').attr("disabled",false);
+				hideLoading();
+				if (result.success) {
+					A.Controller.back();
+				}else {
+					A.showToast(result.msg);
+				}
+			});
+		}
+	});
+});
+</script>
