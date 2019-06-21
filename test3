@@ -1,20 +1,524 @@
-startTimeChecked = selectedVal;
-now = new Date(startTimeChecked[0],startTimeChecked[1] - 1,startTimeChecked[2],startTimeChecked[3],startTimeChecked[4]);
-$('#port_publish_start_time').text(DateUtil.format(now,"yyyy/MM/dd hh:mm"));
-$('#port_publish_setting_start_date').text(DateUtil.format(now,"yyyy年MM月dd日"));
-$('#port_publish_setting_start_time').text(DateUtil.format(now,"hh:mm"));
+package org.djy.cpsb.service.support;
 
-var month = endTimeChecked[1];
-endTimeChecked = selectedVal;
-var now1 = new Date(endTimeChecked[0],endTimeChecked[1] - 1,endTimeChecked[2],endTimeChecked[3],endTimeChecked[4]);
-console.log(now1.getMonth());
-$('#port_publish_end_time').text(DateUtil.format(now1,"yyyy/MM/dd hh:mm"));
-$('#port_publish_setting_end_date').text(DateUtil.format(now1,"yyyy年MM月dd日"));
-$('#port_publish_setting_end_time').text(DateUtil.format(now1,"hh:mm"))
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.text.SimpleDateFormat;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-now = new Date(startTimeChecked[0],startTimeChecked[1] - 1,startTimeChecked[2],startTimeChecked[3],startTimeChecked[4]);
-var startTime = DateUtil.format(now,"yyyy-MM-dd hh:mm");
-var starTimeMills = now.getTime();
+import org.apache.http.client.CookieStore;
+import org.apache.http.impl.client.BasicCookieStore;
+import org.djy.cpsb.service.KeytopHttpService;
+import org.djy.cpsb.service.impl.HttpClientServiceImpl;
+import org.djy.cpsb.service.support.akk.ParkinglotGroupInfo;
+import org.djy.cpsb.service.support.akk.ParkinglotInfo;
+import org.djy.cpsb.service.support.http.HttpReq;
+import org.djy.cpsb.service.support.tongli.SessionTimeoutException;
+import org.djy.cpsb.service.support.wangrui.PlCarsDTO;
+import org.djy.cpsb.service.support.wangrui.PlMonthCarsDTO;
+import org.djy.cpsb.service.support.wangrui.PlMonthTypeDTO;
+import org.djy.cpsb.service.support.wangrui.PlParkingSpaceDTO;
+import org.djy.cpsb.service.support.wangrui.QueryMonthCarResp;
+import org.djy.cpsb.service.support.wangrui.VMonthCarsModel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
+
+public class VendorWangRuiSupport {
+
+	private static final Logger logger = LoggerFactory.getLogger(VendorWangRuiSupport.class);
+
+	private static SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+	private String REMOTE_URL_PREFIX = "";// https://www.icarcom.cn/guest
+	private String LOGIN_NAME = "";// szlswy
+	private String LOGIN_PASS = "";// lsjy123456
+
+	private long loginTime = 0l;
+
+	public String RETURN_SUCCESS = "success";
+	public String RETURN_FAIL = "failed";
+	public String RETURN_EXIST = "exist";
+
+	private CookieStore cookieStore = null;
+	private KeytopHttpService keytopHttpService = null;
+
+	public void init(String remoteUrlPrefix, String loginName, String loginPass) {
+		REMOTE_URL_PREFIX = remoteUrlPrefix;
+		LOGIN_NAME = loginName;
+		LOGIN_PASS = loginPass;
+
+		cookieStore = new BasicCookieStore();
+		keytopHttpService = new HttpClientServiceImpl();
+	}
+	
+	private String loginMd5() {
+		String url = REMOTE_URL_PREFIX + "/rest/loginMd5";
+		Map<String, String> headers = new HashMap<>();
+		setCommonHeaders(headers);
+
+		Map<String, String> params = new HashMap<>();
+		params.put("passWord", LOGIN_PASS);
+		String ret = keytopHttpService.requestCookieUrl(HttpReq.HTTP_POST, url, headers, params, null, cookieStore);
+//		{"code":"200","mgs":"成功","md5":"202CB962AC59075B964B07152D234B70"}
+		if (ret == null || "".equals(ret.trim())) {
+			logger.error("Failed to get pwd md5,errorInfo:" + ret);
+			return null;
+		} else {
+			JSONObject jsonObj = (JSONObject) JSON.parse(ret);
+			String code = jsonObj.getString("code");
+			if ("200".equals(code)) {
+				return jsonObj.getString("md5");
+			}else {
+				logger.error("Failed to get pwd md5,errorInfo:" + ret);
+				return null;
+			}
+		}
+	}
+
+	public boolean login() throws SessionTimeoutException{
+		String pwdMd5 = loginMd5();
+		if (pwdMd5 == null || "".equals(pwdMd5)) {
+			return false;
+		}
 		
-var hours = endTimeChecked[3];
-now = new Date(endTimeChecked[0],endTimeChecked[1] - 1,endTimeChecked[2],hours,endTimeChecked[4]);
+		String url = REMOTE_URL_PREFIX + "/loginSubmit";
+		Map<String, String> headers = new HashMap<>();
+		headers.put("Accept","text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3");
+		headers.put("Accept-Encoding", "gzip, deflate, br");
+		headers.put("Accept-Language", "zh-CN,zh;q=0.9");
+		headers.put("Cache-Control", "max-age=0");
+		headers.put("Content-Type", "application/x-www-form-urlencoded");
+		headers.put("Host", "127.0.0.1:8080");
+		headers.put("Connection", "keep-alive");
+		headers.put("User-Agent","Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36");
+		
+		Map<String, String> params = new HashMap<>();
+		params.put("userName", LOGIN_NAME);
+		params.put("password", pwdMd5);
+		String loction = keytopHttpService.requestCookieUrl(HttpReq.HTTP_POST, url, headers, params, null, cookieStore);
+		if (loction == null || "".equals(loction.trim())) {
+			throw new SessionTimeoutException("http error");
+		} else {
+			if ("/parking/home".equals(loction)) {
+				return true;
+			}else {
+				return false;
+			}
+		}
+	}
+
+	/**
+	 * 创建车位
+	 * 
+	 * @param name
+	 *            名称(GXCW001)
+	 * @param fee
+	 *            车位费(50)
+	 * @param parkinglotInfo
+	 *            停车场
+	 */
+	public boolean createParking(String name, int fee, ParkinglotInfo parkinglotInfo) throws SessionTimeoutException {
+		String url = REMOTE_URL_PREFIX + "/parkingSpace/save";
+
+		Map<String, String> headers = new HashMap<>();
+		setCommonHeaders(headers);
+		setFormHeaders(headers);
+
+		Map<String, String> params = new HashMap<>();
+		params.put("number", name);
+		params.put("fee", fee + "");
+		params.put("parkingLotId", parkinglotInfo.getId());
+		params.put("create", "新建");
+
+		String value = keytopHttpService.requestCookieUrl(HttpReq.HTTP_POST, url, headers, params, null, cookieStore);
+
+		if (value == null || "".equals(value.trim())) {
+			throw new SessionTimeoutException("http error");
+		} else {
+			String result = getUrlResult(value);
+			
+			if (result == null) {
+				throw new SessionTimeoutException(value);
+			} else {
+				if (result.equals(RETURN_SUCCESS)) {
+					return true;
+				} else {
+					return false;
+				}
+			}
+		}
+	}
+
+	/**
+	 * 查询车位列表
+	 * 
+	 * @param name
+	 * @return
+	 */
+	public List<ParkinglotInfo> queryParkingList(String name) throws SessionTimeoutException {
+		String url = REMOTE_URL_PREFIX + "/parkingSpace/findList?";
+
+		StringBuilder buffer = new StringBuilder();
+		addParam(buffer, "draw", "1");
+		addParam(buffer, "start", "0");
+		addParam(buffer, "length", "10");
+		addParam(buffer, "parkingSpaceNum", name);
+
+		url = url + buffer.toString().substring(0, buffer.length() - 1);
+
+		Map<String, String> headers = new HashMap<>();
+		setCommonHeaders(headers);
+
+		String value = keytopHttpService.requestCookieUrl(HttpReq.HTTP_GET, url, headers, null, null, cookieStore);
+
+		if (value == null || "".equals(value.trim())) {
+			throw new SessionTimeoutException("http error");
+		} else {
+			// [{"selected":"","name":"苏州朗诗绿色家园别墅区地库停车场","id":"fc2750f7-18f7-4126-ae43-174c14a8d329"},{"selected":"","name":"苏州朗诗绿色家园地库停车场","id":"c0f9f359-2325-4f58-a962-fd10d629ec1f"},{"selected":"","name":"苏州朗诗绿色家园地面停车场","id":"0db37c01-d405-40ae-9b9f-06807bc44e4e"}]
+			List<ParkinglotInfo> list = JSON.parseArray(value, ParkinglotInfo.class);
+			return list;
+		}
+	}
+
+	/**
+	 * 查询指定车辆信息
+	 * 
+	 * @param carId
+	 * @return
+	 */
+	public List<VMonthCarsModel> queryCar(String carId) throws SessionTimeoutException {
+		String url = REMOTE_URL_PREFIX + "/cars/api/list/month?";
+		StringBuilder buffer = new StringBuilder();
+		addParam(buffer, "carNo", carId);
+		url = url + buffer.toString().substring(0, buffer.length() - 1);
+
+		Map<String, String> headers = new HashMap<>();
+		setCommonHeaders(headers);
+
+		String value = keytopHttpService.requestCookieUrl(HttpReq.HTTP_GET, url, headers, null, null, cookieStore);
+		if (value == null || "".equals(value.trim())) {
+			throw new SessionTimeoutException("http error");
+		} else {
+			QueryMonthCarResp resp = JSON.parseObject(value, QueryMonthCarResp.class);
+			return resp.getDataList();
+		}
+	}
+
+	/**
+	 * 创建车辆
+	 * 
+	 * @param name
+	 *            车主名称
+	 * @param carId
+	 *            车牌号码
+	 * @param parkingLotGroupId
+	 *            停车场组id列表
+	 * @param expireTime
+	 *            过期时间 (2019-06-01 20:25)
+	 */
+	public boolean createCar(PlMonthCarsDTO carDTO) throws SessionTimeoutException {
+		String url = REMOTE_URL_PREFIX + "/cars/api/save/month?";
+
+		Map<String, String> headers = new HashMap<>();
+		setCommonHeaders(headers);
+		
+		PlCarsDTO plCarsDTO = carDTO.getPlCarsDTO();
+		PlMonthTypeDTO plMonthTypeDTO = carDTO.getPlMonthTypeDTO();
+		PlParkingSpaceDTO plParkingSpaceDTO = carDTO.getPlParkingSpaceDTO();
+		
+		StringBuilder buffer = new StringBuilder();
+		
+		addParam(buffer,"pageNo", getStringValue(carDTO.getPageNo()));
+		addParam(buffer,"pageSize", getStringValue(carDTO.getPageSize()));
+		addParam(buffer,"id", getStringValue(carDTO.getId()));
+		addParam(buffer,"cuttingStatus", getStringValue(carDTO.getCuttingStatus()));
+		addParam(buffer,"autoRechargeMonths", getStringValue(carDTO.getAutoRechargeMonths()));
+		addParam(buffer,"isPayFeeProxy", getStringValue(carDTO.getIsPayFeeProxy()));
+		addParam(buffer,"plCarsDTO.id", getStringValue(plCarsDTO.getId()));
+		addParam(buffer,"gap", getStringValue(carDTO.getGap()));
+		addParam(buffer,"editReason", getStringValue(carDTO.getEditReason()));
+		addParam(buffer,"plCarsDTO.carNo", getStringValue(plCarsDTO.getCarNo()));
+		addParam(buffer,"overTopMode", getStringValue(carDTO.getOverTopMode()));
+		addParam(buffer,"plCarsDTO.carNoColor", getStringValue(plCarsDTO.getCarNoColor()));
+		addParam(buffer,"plCarsDTO.custName", getStringValue(plCarsDTO.getCustName()));
+		addParam(buffer,"plCarsDTO.custCode", getStringValue(plCarsDTO.getCustCode()));
+		addParam(buffer,"plCarsDTO.autoLock", getStringValue(plCarsDTO.getAutoLock()));
+		addParam(buffer,"plCarsDTO.carMaker", getStringValue(plCarsDTO.getCarMaker()));
+		addParam(buffer,"plCarsDTO.propertyName", getStringValue(plCarsDTO.getPropertyName()));
+		addParam(buffer,"plCarsDTO.propertyCode", getStringValue(plCarsDTO.getPropertyCode()));
+		addParam(buffer,"plCarsDTO.carType", getStringValue(plCarsDTO.getCarType()));
+		addParam(buffer,"plCarsDTO.carColor", getStringValue(plCarsDTO.getCarColor()));
+		addParam(buffer,"plMonthTypeDTO.id", getStringValue(plMonthTypeDTO.getId()));
+		if (plParkingSpaceDTO != null) {
+			addParam(buffer,"plParkingSpaceDTO.code", getStringValue(plParkingSpaceDTO.getCode()));
+			addParam(buffer,"plParkingSpaceDTO.id", getStringValue(plParkingSpaceDTO.getId()));
+		}
+		addParam(buffer,"plCarsDTO.carMakerType", getStringValue(plCarsDTO.getCarMakerType()));
+		addParam(buffer,"startTimeStr", getStringValue(carDTO.getStartTimeStr()));
+		addParam(buffer,"agreementId", getStringValue(carDTO.getAgreementId()));
+		addParam(buffer,"plCarsDTO.driveNo", getStringValue(plCarsDTO.getDriveNo()));
+		addParam(buffer,"endTimeStr", getStringValue(carDTO.getEndTimeStr()));
+		addParam(buffer,"agreementStartStr", getStringValue(carDTO.getAgreementStart()));
+		addParam(buffer,"agreementEndStr", getStringValue(carDTO.getAgreementEndStr()));
+		addParam(buffer,"plCarsDTO.greenDayMode", getStringValue(plCarsDTO.getGreenDayMode()));
+		addParam(buffer,"plCarsDTO.greenDayValue", getStringValue(plCarsDTO.getGreenDayValue()));
+		addParam(buffer,"remarks", "共享车位使用");
+		
+		url = url + buffer.toString().substring(0, buffer.length() - 1);
+		
+		String value = keytopHttpService.requestCookieUrl(HttpReq.HTTP_GET, url, headers, null, null, cookieStore);
+		if (value == null || "".equals(value.trim())) {
+			throw new SessionTimeoutException("http error");
+		} else {
+			JSONObject jsonObj = (JSONObject) JSON.parse(value);
+			String ret = jsonObj.getString("ret");
+			if ("success".equals(ret)) {
+				return true;
+			}else {
+				logger.error("Failed to add car :" + ret);
+				return false;
+			}
+		}
+	}
+	
+	public void deleteCar(String carId) {
+		
+	}
+
+	/**
+	 * 绑定车辆与车位
+	 * 
+	 * @param carUUID
+	 *            车辆uid
+	 * @param parkingIdList
+	 *            车位id集合
+	 */
+	public void bindCarParking(String carUUID, List<String> parkingIdList) throws SessionTimeoutException {
+		String url = REMOTE_URL_PREFIX + "/parkingSpace/findParkingLotList?";
+
+		StringBuilder buffer = new StringBuilder();
+		addParam(buffer, "id", carUUID);
+
+		Map<String, String> map = new HashMap<>();
+
+		for (int i = 0; i < parkingIdList.size(); i++) {
+			map.put("id", parkingIdList.get(i));
+		}
+
+		String jsonString = JSON.toJSONString(map);
+
+		addParam(buffer, "psIdList", jsonString);
+
+		url = url + buffer.toString().substring(0, buffer.length() - 1);
+
+		Map<String, String> headers = new HashMap<>();
+		setCommonHeaders(headers);
+
+		String value = keytopHttpService.requestCookieUrl(HttpReq.HTTP_GET, url, headers, null, null, cookieStore);
+
+		if (value == null || "".equals(value.trim())) {
+			throw new SessionTimeoutException("http error");
+		} else {
+			System.out.println(value);
+		}
+	}
+
+	/**
+	 * 解绑车辆与车位
+	 * 
+	 * @param carUUID
+	 *            车辆uid
+	 * @param parkingId
+	 *            车位id
+	 */
+	public void unbindCarParking(String carUUID, String parkingId) throws SessionTimeoutException {
+		String url = REMOTE_URL_PREFIX + "/whiteList/removePs?";
+
+		StringBuilder buffer = new StringBuilder();
+		addParam(buffer, "id", carUUID);
+		addParam(buffer, "psId", parkingId);
+
+		url = url + buffer.toString().substring(0, buffer.length() - 1);
+
+		Map<String, String> headers = new HashMap<>();
+		setCommonHeaders(headers);
+
+		String value = keytopHttpService.requestCookieUrl(HttpReq.HTTP_GET, url, headers, null, null, cookieStore);
+
+		if (value == null || "".equals(value.trim())) {
+			throw new SessionTimeoutException("http error");
+		} else {
+			System.out.println(value);
+		}
+	}
+
+	/**
+	 * 查询停车场列表
+	 */
+	public List<ParkinglotInfo> queryParkinglotList() throws SessionTimeoutException {
+		String url = REMOTE_URL_PREFIX + "/parkingSpace/findParkingLotList?";
+
+		Map<String, String> headers = new HashMap<>();
+		setCommonHeaders(headers);
+
+		StringBuilder buffer = new StringBuilder();
+		addParam(buffer, "draw", "1");
+		addParam(buffer, "length", "10");
+
+		url = url + buffer.toString().substring(0, buffer.length() - 1);
+
+		String value = keytopHttpService.requestCookieUrl(HttpReq.HTTP_GET, url, headers, null, null, cookieStore);
+
+		if (value == null || "".equals(value.trim())) {
+			throw new SessionTimeoutException("http error");
+		} else {
+			// [{"selected":"","name":"苏州朗诗绿色家园别墅区地库停车场","id":"fc2750f7-18f7-4126-ae43-174c14a8d329"},{"selected":"","name":"苏州朗诗绿色家园地库停车场","id":"c0f9f359-2325-4f58-a962-fd10d629ec1f"},{"selected":"","name":"苏州朗诗绿色家园地面停车场","id":"0db37c01-d405-40ae-9b9f-06807bc44e4e"}]
+			List<ParkinglotInfo> list = JSON.parseArray(value, ParkinglotInfo.class);
+			return list;
+		}
+	}
+
+	/**
+	 * 查询停车场组列表
+	 */
+	public List<ParkinglotGroupInfo> queryParkinglotGroupList() throws SessionTimeoutException {
+		String url = REMOTE_URL_PREFIX + "/homePage/findParkingLotGroupList";
+
+		Map<String, String> headers = new HashMap<>();
+		setCommonHeaders(headers);
+
+		String value = keytopHttpService.requestCookieUrl(HttpReq.HTTP_GET, url, headers, null, null, cookieStore);
+
+		if (value == null || "".equals(value.trim())) {
+			throw new SessionTimeoutException("http error");
+		} else {
+			// [{"name":"苏州朗诗绿色家园别墅区地库停车场组","id":"344fdcb8-fc7b-4ad4-8e96-12ad88e44257"},{"name":"苏州朗诗绿色家园地库停车场组","id":"3e9cc317-3648-4d01-bc4e-171f06ba8ed7"},{"name":"苏州朗诗绿色家园地面停车场组","id":"efc331df-0739-40d5-b251-c7aab1de9f02"}]
+			List<ParkinglotGroupInfo> list = JSON.parseArray(value, ParkinglotGroupInfo.class);
+			return list;
+		}
+	}
+
+	public void queryChargeList() {
+		String url = REMOTE_URL_PREFIX + "/chargeStandard/chargeList";
+
+		Map<String, String> headers = new HashMap<>();
+		setCommonHeaders(headers);
+
+		Map<String, String> params = new HashMap<>();
+		params.put("draw", "1");
+		params.put("start", "0");
+		params.put("length", "10");
+		params.put("search[value]", "");
+		params.put("search[regex]", "false");
+
+		String value = keytopHttpService.requestCookieUrl(HttpReq.HTTP_POST, url, headers, params, null, cookieStore);
+
+		if (value == null || "".equals(value.trim())) {
+		} else {
+			System.out.println(value);
+		}
+	}
+
+	private static void setCommonHeaders(Map<String, String> headers) {
+		headers.put("Accept","application/json, text/javascript, */*; q=0.01");
+		headers.put("Accept-Encoding", "gzip, deflate, br");
+		headers.put("Accept-Language", "zh-CN,zh;q=0.9");
+		headers.put("Host", "127.0.0.1:8080");
+		headers.put("Connection", "keep-alive");
+		headers.put("User-Agent","Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36");
+		
+	}
+
+	private static void setFormHeaders(Map<String, String> headers) {
+		headers.put("Content-Type", "application/x-www-form-urlencoded");
+	}
+
+	private static String getUrlResult(String value) {
+		// Location:http://www.icarcom.cn/guest/parkingSpace/show/c655131e-4731-40f5-b9d6-a6548f792420?success=success
+		if (value.startsWith("Location")) {
+			return null;
+		} else {
+			String[] strs = value.split("\\?");
+
+			if (strs.length <= 1) {
+				return null;
+			}
+
+			String result = strs[strs.length - 1];
+
+			if (result.endsWith("=success")) {
+				return "success";
+			} else {
+				return "failed";
+			}
+		}
+	}
+
+	private static void addParam(StringBuilder buffer, String name, String value) {
+		try {
+			String param = name + "=" + URLEncoder.encode(value, "UTF-8");
+			buffer.append(param).append("&");
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public String getStringValue(Object parame) {
+		return parame != null ? String.valueOf(parame) : "";
+	}
+	
+	public static void main(String[] args) throws SessionTimeoutException {
+		VendorWangRuiSupport support = new VendorWangRuiSupport();
+		support.init("http://127.0.0.1:8080/parking", "Admin", "202CB962AC59075B964B07152D234B70");
+//		support.init("http://127.0.0.1:8080/parking", "Admin", "123");
+		support.loginMd5();
+		boolean login = support.login();
+		if (login) {
+			List<VMonthCarsModel> modelList = support.queryCar("苏E88888");
+			if (modelList.size() > 0) {
+				VMonthCarsModel vMonthCarsModel = modelList.get(0);
+				
+				PlMonthCarsDTO monthCarsDTO = new PlMonthCarsDTO();
+				monthCarsDTO.setCuttingStatus(0);
+				monthCarsDTO.setIsPayFeeProxy(0);
+				monthCarsDTO.setGap(1);
+				
+				PlCarsDTO carsDTO = new PlCarsDTO();
+				monthCarsDTO.setPlCarsDTO(carsDTO);
+				carsDTO.setCarNo("苏E11111");
+				
+				monthCarsDTO.setOverTopMode(0);
+				
+				carsDTO.setCarNoColor(0);
+				carsDTO.setCustName(vMonthCarsModel.getCustName());
+				carsDTO.setCustCode(vMonthCarsModel.getCustCode());
+				carsDTO.setAutoLock(0);
+				carsDTO.setCarMaker(0);
+				carsDTO.setPropertyName(vMonthCarsModel.getPropertyName());
+				carsDTO.setPropertyCode(vMonthCarsModel.getPropertyCode());
+				carsDTO.setCarType(0);
+				carsDTO.setCarColor(0);
+				
+				PlMonthTypeDTO monthTypeDTO = new PlMonthTypeDTO();
+				monthTypeDTO.setId("ae42ba149a134188b922e3fd3b6ba4e4");
+				monthCarsDTO.setPlMonthTypeDTO(monthTypeDTO);
+				
+				
+				monthCarsDTO.setStartTimeStr(vMonthCarsModel.getStartTimeStr());
+				monthCarsDTO.setEndTimeStr(vMonthCarsModel.getEndTimeStr());
+				
+				carsDTO.setGreenDayMode(-1);
+				carsDTO.setGreenDayValue(-1);
+				
+				monthCarsDTO.setPayType(0);
+				
+				boolean createCar = support.createCar(monthCarsDTO);
+				System.err.println(createCar);
+			}
+		}
+	}
+}
