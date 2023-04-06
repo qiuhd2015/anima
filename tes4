@@ -1,1 +1,183 @@
-111111111111111111111111111111
+import java.math.BigDecimal;
+
+public class GxcwCharging {
+    
+    
+    /**
+     * 免费时长
+     */
+    private float freeDuration = 0f;
+    /**
+     * 起始计费时长
+     */
+    private float startHour = 5f;
+    /**
+     * 起始计费费用
+     */
+    private float startCost;
+    /**
+     * 封顶费用
+     */
+    private float cappingFee;
+    /**
+     * 封顶小时
+     */
+    private float cappingHour = 24f;
+    /**
+     * 每小时价格
+     */
+    private float pricePerHour;
+    /**
+     * 超时后每小时价格
+     */
+    private float overtimePerHour = 1f;
+    
+    public double calcFee(float hour,boolean isCalcFree) {
+        if (hour <= 0.00f) {
+            return 0d;
+        }
+        
+        if (isCalcFree && freeDuration > 0f && hour <= freeDuration) {
+            return 0d;
+        }
+        
+        //在起始计费时间内
+        if (startHour > 0.00f && hour <= startHour) {
+            return AmountUtil.get2Double(Double.valueOf(startCost), 2);
+        }
+        
+        if (cappingHour > 0f && hour <= cappingHour && hour >= startHour) {
+            //每小时价格
+            if (pricePerHour > 0.00f && AmountUtil.compareTo(Double.valueOf(pricePerHour), Double.valueOf(0.00d)) == 1) {
+                double diffHour = hour - startHour;
+                double calcPrice = AmountUtil.multiply(diffHour, Double.valueOf(pricePerHour), 2);
+                double taotalFee = AmountUtil.add(Double.valueOf(startCost), calcPrice, 2);
+                int compareTo = AmountUtil.compareTo(taotalFee,Double.valueOf(cappingFee));
+                if (compareTo == 1) {
+                    return AmountUtil.get2Double(Double.valueOf(cappingFee), 2);
+                }else {
+                    return taotalFee;
+                }
+            }else {
+                return AmountUtil.get2Double(Double.valueOf(cappingFee), 2);
+            }
+        }else if (cappingHour > 0f && hour > cappingHour) {
+                BigDecimal val1 = new BigDecimal(hour);
+                BigDecimal val2 = new BigDecimal(cappingHour);
+                BigDecimal[] bigDecimals = val1.divideAndRemainder(val2);
+                double diffDay = bigDecimals[0].doubleValue();
+                float diffHour = bigDecimals[1].floatValue();
+                double totalDayFree  = AmountUtil.multiply(diffDay, Double.valueOf(cappingFee), 2);
+                double diffHourFree = 0d;
+                if (diffHour > 0.00d) {
+                    diffHourFree = calcFee(diffHour,false);
+                }
+                return AmountUtil.add(totalDayFree, diffHourFree, 2);
+        } else {
+            if (pricePerHour > 0.00f && AmountUtil.compareTo(Double.valueOf(pricePerHour), Double.valueOf(0.00d)) == 1) {
+                
+            }
+        }
+        return Double.MAX_VALUE;
+    }
+    
+    public static void main(String[] args) {
+        //5小时以内5元,超过5小时1元/每小时 24小时13元封顶,不足1小时按照1小时计费超过24小时,累计计费
+//        GxcwCharging charging = new GxcwCharging();
+//        charging.setCappingFee(13f);
+//        charging.setCappingHour(24f);
+//        charging.setFreeDuration(0f);
+//        charging.setPricePerHour(1f);
+//        charging.setStartCost(5f);
+//        charging.setStartHour(5f);
+//        
+//        for (int i = 1;i < 100;i++) {
+//            float hour = Float.valueOf(i);
+//            System.err.println(hour + "小时," + charging.calcFee(hour) + "元");
+//        }
+//        System.err.println(48 + "小时," + charging.calcFee(48f) + "元");
+            
+          //8小时以内5元 超过8小时10元
+//          GxcwCharging charging = new GxcwCharging();
+//          charging.setCappingFee(10f);
+//          charging.setCappingHour(24f);
+//          charging.setFreeDuration(0f);
+//          charging.setPricePerHour(0f);
+//          charging.setStartCost(5f);
+//          charging.setStartHour(8f);
+//          for (int i = 1;i < 100;i++) {
+//            float hour = Float.valueOf(i);
+//            System.err.println(hour + "小时," + charging.calcFee(hour) + "元");
+//          }
+//          System.err.println(9 + "小时," + charging.calcFee(9f) + "元");
+        GxcwCharging charging = new GxcwCharging();
+        charging.setCappingFee(10f);
+        charging.setCappingHour(24f);
+        
+        charging.setFreeDuration(2f);
+        charging.setPricePerHour(0f);
+        charging.setStartCost(5f);
+        charging.setStartHour(12f);
+        for (int i = 1; i < 100; i++) {
+            float hour = Float.valueOf(i);
+            System.err.println(hour + "小时," + charging.calcFee(hour,true) + "元");
+        }
+//        System.err.println(3 + "小时," + charging.calcFee(3f) + "元");
+    }
+
+    public float getFreeDuration() {
+        return freeDuration;
+    }
+
+    public void setFreeDuration(float freeDuration) {
+        this.freeDuration = freeDuration;
+    }
+
+    public float getStartHour() {
+        return startHour;
+    }
+
+    public void setStartHour(float startHour) {
+        this.startHour = startHour;
+    }
+
+    public float getStartCost() {
+        return startCost;
+    }
+
+    public void setStartCost(float startCost) {
+        this.startCost = startCost;
+    }
+
+    public float getCappingFee() {
+        return cappingFee;
+    }
+
+    public void setCappingFee(float cappingFee) {
+        this.cappingFee = cappingFee;
+    }
+
+    public float getCappingHour() {
+        return cappingHour;
+    }
+
+    public void setCappingHour(float cappingHour) {
+        this.cappingHour = cappingHour;
+    }
+
+    public float getPricePerHour() {
+        return pricePerHour;
+    }
+
+    public void setPricePerHour(float pricePerHour) {
+        this.pricePerHour = pricePerHour;
+    }
+
+    public float getOvertimePerHour() {
+        return overtimePerHour;
+    }
+
+    public void setOvertimePerHour(float overtimePerHour) {
+        this.overtimePerHour = overtimePerHour;
+    }
+}
