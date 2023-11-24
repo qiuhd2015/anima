@@ -657,8 +657,7 @@ public class PreArriveServlet extends HttpServlet {
 
         CarPreArriveResponse newSuccessInstane = CarPreArriveResponse.newSuccessInstane();
         String response = JSON.toJSONString(newSuccessInstane);
-        System.err.println(response);
-
+        System.err.println("36a0b9fb18d9ecb70d2cdcd8914ff861");
     }
 }
 
